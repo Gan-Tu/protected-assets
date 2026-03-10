@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Clock4Icon, FileLock2Icon, MailPlusIcon, Trash2Icon, XIcon, PlusIcon } from "lucide-react";
 
@@ -16,7 +17,12 @@ import type { AccessRequestStatus } from "@/lib/types";
 import { formatRelativeWindow, getBaseUrl, cn } from "@/lib/utils";
 
 const primaryLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 shadow-sm";
+  "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 sm:w-auto sm:whitespace-nowrap";
+
+export const metadata: Metadata = {
+  title: "Dashboard | Protected Assets",
+};
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -61,7 +67,7 @@ export default async function DashboardPage({
           <h1 className="text-3xl font-bold tracking-tight text-zinc-950">Dashboard</h1>
           <p className="text-sm text-zinc-500 mt-1">Manage your protected assets and access requests.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full items-center gap-3 sm:w-auto">
           <Link href="/dashboard/assets/new" className={primaryLinkClass}>
             <PlusIcon className="size-4" />
             New Asset
@@ -71,13 +77,13 @@ export default async function DashboardPage({
 
       <section className="grid gap-6 sm:grid-cols-3">
         {stats.map((stat) => (
-          <Card key={stat.label} className="border-zinc-200/60 shadow-sm">
-            <CardContent className="pt-6">
+          <Card key={stat.label} className="border-zinc-200/60 py-0 shadow-sm">
+            <CardContent className="p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-zinc-500">{stat.label}</p>
                 <stat.icon className="size-4 text-zinc-400" />
               </div>
-              <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">{stat.value}</p>
+              <p className="mt-1 text-3xl font-bold tracking-tight text-zinc-950">{stat.value}</p>
             </CardContent>
           </Card>
         ))}

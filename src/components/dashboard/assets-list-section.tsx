@@ -104,20 +104,20 @@ export function AssetsListSection({
                         Last updated {formatHumanDateTime(asset.updated_at)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <CopyLinkButton value={shareUrl} />
                       <Link
                         href={shareUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer")}
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer w-full sm:w-auto")}
                       >
                         <ExternalLinkIcon className="size-3.5" />
                         Open URL
                       </Link>
                       <Link
                         href={`/dashboard/assets/${asset.id}`}
-                        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer")}
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer w-full sm:w-auto")}
                       >
                         Edit
                       </Link>

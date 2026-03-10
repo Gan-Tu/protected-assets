@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
+
 import { updateSettingsAction } from "@/app/dashboard/actions";
 import { ProfileSettingsForm } from "@/components/forms/profile-settings-form";
 import { getOwnerProfile, requireOwner } from "@/lib/data";
+
+export const metadata: Metadata = {
+  title: "Settings | Protected Assets",
+};
 
 export default async function SettingsPage() {
   const owner = await requireOwner();

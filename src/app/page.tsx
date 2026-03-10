@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getLandingUser } from "@/lib/data";
 
 const primaryLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 shadow-sm";
+  "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-5 py-2.5 text-center text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 sm:w-auto sm:whitespace-nowrap";
 
 const features = [
   {
@@ -35,10 +35,13 @@ export default async function Home() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
       
       <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 lg:px-10">
-        <header className="flex items-center justify-between gap-4">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <LogoMark />
-          <nav className="flex items-center gap-6">
-            <Link href={user ? "/dashboard" : "/auth/sign-in"} className="text-sm font-medium text-zinc-600 hover:text-zinc-950 transition">
+          <nav className="grid w-full grid-cols-2 items-center gap-3 sm:flex sm:w-auto sm:gap-6">
+            <Link
+              href={user ? "/dashboard" : "/auth/sign-in"}
+              className="inline-flex cursor-pointer items-center justify-center rounded-md px-3 py-2 text-center text-sm font-medium text-zinc-600 transition hover:text-zinc-950 sm:px-0 sm:py-0"
+            >
               {user ? "Dashboard" : "Sign in"}
             </Link>
             <Link href={user ? "/dashboard/assets/new" : "/auth/sign-up"} className={primaryLinkClass}>

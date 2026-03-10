@@ -15,7 +15,7 @@ export function CopyLinkButton({ value }: { value: string }) {
       type="button"
       variant="outline"
       size="sm"
-      className="cursor-pointer gap-2"
+      className="cursor-pointer gap-2 w-full sm:w-auto"
       onClick={() => {
         startTransition(async () => {
           await navigator.clipboard.writeText(value);

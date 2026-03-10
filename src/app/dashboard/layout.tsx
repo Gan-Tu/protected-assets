@@ -8,9 +8,9 @@ import { requireOwner } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 const navLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 sm:px-3 sm:py-2";
 const ghostActionClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 sm:px-3 sm:py-2";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutGridIcon },
@@ -27,9 +27,9 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-white">
       <div className="mx-auto flex max-w-7xl flex-col px-6 py-6 sm:px-8 lg:px-10">
-        <header className="mb-8 flex items-center justify-between border-b border-zinc-100 pb-6">
+        <header className="mb-8 flex flex-col gap-4 border-b border-zinc-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
           <LogoMark />
-          <nav className="flex items-center gap-2">
+          <nav className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 sm:w-auto sm:gap-x-2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -40,7 +40,7 @@ export default async function DashboardLayout({
                 {item.label}
               </Link>
             ))}
-            <div className="h-4 w-px bg-zinc-200 mx-2" />
+            <div className="hidden h-4 w-px bg-zinc-200 mx-2 sm:block" />
             <form action={signOutAction}>
               <button
                 type="submit"

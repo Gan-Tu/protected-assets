@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeftIcon } from "lucide-react";
 import { upsertAssetAction } from "@/app/dashboard/actions";
 import { AssetForm } from "@/components/forms/asset-form";
 import { getDashboardData, requireOwner } from "@/lib/data";
+
+export const metadata: Metadata = {
+  title: "New Asset | Protected Assets",
+};
 
 export default async function NewAssetPage() {
   const owner = await requireOwner();

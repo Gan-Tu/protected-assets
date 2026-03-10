@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeftIcon, ExternalLinkIcon, Trash2Icon } from "lucide-react";
@@ -16,6 +17,10 @@ import { RequestHistoryRow } from "@/components/dashboard/request-history-row";
 import { getAssetForEditor, getDashboardData, requireOwner } from "@/lib/data";
 import type { AccessRequestStatus } from "@/lib/types";
 import { cn, getBaseUrl } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  title: "Edit Asset | Protected Assets",
+};
 
 export default async function EditAssetPage({
   params,
@@ -51,30 +56,30 @@ export default async function EditAssetPage({
     <div className="max-w-5xl mx-auto space-y-12 py-6">
       <SaveSuccessToast open={saved === "1"} />
       <header className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
           >
             <ChevronLeftIcon className="size-4" />
             Back to dashboard
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="grid w-full gap-2 sm:flex sm:w-auto sm:items-center">
             <Link
               href={shareUrl}
               target="_blank"
               rel="noreferrer"
               className={cn(
                 buttonVariants({ variant: "outline", size: "lg" }),
-                "cursor-pointer px-4 text-xs font-bold uppercase tracking-wider text-zinc-600",
+                "cursor-pointer w-full px-4 text-xs font-bold uppercase tracking-wider text-zinc-600 sm:w-auto",
               )}
             >
               <ExternalLinkIcon className="size-3.5" />
               Open URL
             </Link>
 
-            <form id={deleteFormId} action={deleteAssetAction}>
+            <form id={deleteFormId} action={deleteAssetAction} className="w-full sm:w-auto">
               <input type="hidden" name="asset_id" value={asset.id} />
               <ConfirmSubmitButton
                 formId={deleteFormId}
@@ -83,31 +88,33 @@ export default async function EditAssetPage({
                 description="This removes the asset and any associated stored files. This action cannot be undone."
                 confirmLabel="Delete"
                 triggerVariant="outline"
-                triggerClassName="h-9 px-4 text-xs font-bold uppercase tracking-wider text-red-600 border-red-100 bg-red-50/50 hover:bg-red-50 hover:text-red-700 transition-colors"
+                triggerClassName="h-9 w-full px-4 text-xs font-bold uppercase tracking-wider text-red-600 border-red-100 bg-red-50/50 hover:bg-red-50 hover:text-red-700 transition-colors sm:w-auto"
                 icon={<Trash2Icon className="size-3.5 mr-1.5" />}
               />
             </form>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-950">{asset.name}</h1>
-            {links.length ? (
-              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 border-zinc-200 text-zinc-500">
-                {links.length} {links.length === 1 ? "Link" : "Links"}
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-950 sm:text-3xl">{asset.name}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              {links.length ? (
+                <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 border-zinc-200 text-zinc-500">
+                  {links.length} {links.length === 1 ? "Link" : "Links"}
+                </Badge>
+              ) : null}
+              {files.length ? (
+                <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 border-zinc-200 text-zinc-500">
+                  {files.length} {files.length === 1 ? "File" : "Files"}
+                </Badge>
+              ) : null}
+              <Badge className="text-[10px] font-bold uppercase tracking-wider h-5 bg-zinc-100 text-zinc-600 border-none">
+                {requests.length} Requests
               </Badge>
-            ) : null}
-            {files.length ? (
-              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 border-zinc-200 text-zinc-500">
-                {files.length} {files.length === 1 ? "File" : "Files"}
-              </Badge>
-            ) : null}
-            <Badge className="text-[10px] font-bold uppercase tracking-wider h-5 bg-zinc-100 text-zinc-600 border-none">
-              {requests.length} Requests
-            </Badge>
+            </div>
           </div>
-          <p className="text-base text-zinc-500 max-w-2xl leading-relaxed">
+          <p className="max-w-2xl text-sm leading-relaxed text-zinc-500 sm:text-base">
             Update settings, rotate the share slug, or adjust the release policy.
           </p>
         </div>
@@ -119,12 +126,12 @@ export default async function EditAssetPage({
 
       {processedRequests.length > 0 && (
         <section className="pt-12 border-t border-zinc-100 space-y-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
               <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Request History</h2>
               <p className="text-sm text-zinc-500">The most recent approvals and denials for this asset.</p>
             </div>
-            <form id={clearHistoryFormId} action={clearRequestHistoryAction}>
+            <form id={clearHistoryFormId} action={clearRequestHistoryAction} className="w-full sm:w-auto">
               <input type="hidden" name="asset_id" value={asset.id} />
               <input type="hidden" name="redirect_to" value={`/dashboard/assets/${asset.id}`} />
               <ConfirmSubmitButton
@@ -134,7 +141,7 @@ export default async function EditAssetPage({
                 description="This removes all approved, auto-approved, and denied requests for this asset."
                 confirmLabel="Clear history"
                 triggerVariant="outline"
-                triggerClassName="h-9 px-4 text-xs font-bold uppercase tracking-wider text-zinc-500 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900"
+                triggerClassName="h-9 w-full px-4 text-xs font-bold uppercase tracking-wider text-zinc-500 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 sm:w-auto"
                 icon={<Trash2Icon className="size-3.5 mr-1.5" />}
               />
             </form>
