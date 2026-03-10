@@ -136,7 +136,7 @@ export default async function Home() {
 
         <footer className="border-t border-zinc-100 py-12 text-center">
           <p className="text-sm text-zinc-500">
-            &copy; {new Date().getFullYear()} Protected Assets. Built for security.
+            Powered by Protected Assets by Gan
           </p>
         </footer>
       </div>

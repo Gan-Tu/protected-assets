@@ -29,19 +29,39 @@ export function compactFileSize(bytes: number | null | undefined) {
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-export function formatRelativeWindow(totalSeconds: number) {
+export function formatRelativeWindow(
+  totalSeconds: number,
+  options?: { verbose?: boolean },
+) {
   if (totalSeconds <= 0) return "Immediately";
 
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+  const verbose = options?.verbose ?? false;
 
   const parts = [
-    days ? `${days}d` : null,
-    hours ? `${hours}h` : null,
-    minutes ? `${minutes}m` : null,
-    seconds ? `${seconds}s` : null,
+    days
+      ? verbose
+        ? `${days} ${days === 1 ? "day" : "days"}`
+        : `${days}d`
+      : null,
+    hours
+      ? verbose
+        ? `${hours} ${hours === 1 ? "hour" : "hours"}`
+        : `${hours}h`
+      : null,
+    minutes
+      ? verbose
+        ? `${minutes} ${minutes === 1 ? "minute" : "minutes"}`
+        : `${minutes}m`
+      : null,
+    seconds
+      ? verbose
+        ? `${seconds} ${seconds === 1 ? "second" : "seconds"}`
+        : `${seconds}s`
+      : null,
   ].filter(Boolean);
 
   return parts.join(" ");

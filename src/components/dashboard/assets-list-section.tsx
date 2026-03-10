@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useState } from "react";
 import Link from "next/link";
-import { SearchIcon } from "lucide-react";
+import { ExternalLinkIcon, SearchIcon } from "lucide-react";
 
 import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { Badge } from "@/components/ui/badge";
@@ -80,9 +80,14 @@ export function AssetsListSection({
               <Card key={asset.id} className="border-zinc-200/60 shadow-sm hover:border-zinc-300 transition-colors">
                 <CardContent className="p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-1">
+                    <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold text-zinc-900">{asset.name}</h3>
+                        {asset.auto_approve_enabled ? (
+                          <Badge className="text-[10px] font-bold uppercase tracking-wider py-0 h-4 rounded-sm border-none bg-amber-100 text-amber-700">
+                            Auto
+                          </Badge>
+                        ) : null}
                         {asset.links.length ? (
                           <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider py-0 h-4 rounded-sm border-zinc-200 text-zinc-500">
                             {asset.links.length} {asset.links.length === 1 ? "link" : "links"}
@@ -93,16 +98,20 @@ export function AssetsListSection({
                             {asset.files.length} {asset.files.length === 1 ? "file" : "files"}
                           </Badge>
                         ) : null}
-                        {asset.auto_approve_enabled ? (
-                          <Badge className="text-[10px] font-bold uppercase tracking-wider py-0 h-4 rounded-sm bg-zinc-100 text-zinc-600 border-none">
-                            Auto
-                          </Badge>
-                        ) : null}
                       </div>
-                      <p className="text-sm text-zinc-500 line-clamp-1">{asset.description || "No description"}</p>
+                      <p className="text-sm leading-relaxed text-zinc-500">{asset.description || "No description"}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <CopyLinkButton value={shareUrl} />
+                      <Link
+                        href={shareUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer")}
+                      >
+                        <ExternalLinkIcon className="size-3.5" />
+                        Open URL
+                      </Link>
                       <Link
                         href={`/dashboard/assets/${asset.id}`}
                         className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer")}

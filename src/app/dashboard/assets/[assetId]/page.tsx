@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeftIcon, Trash2Icon } from "lucide-react";
+import { ChevronLeftIcon, ExternalLinkIcon, Trash2Icon } from "lucide-react";
 
 import {
   clearRequestHistoryAction,
@@ -8,22 +8,25 @@ import {
   upsertAssetAction,
 } from "@/app/dashboard/actions";
 import { ConfirmSubmitButton } from "@/components/app/confirm-submit-button";
+import { SaveSuccessToast } from "@/components/app/save-success-toast";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { AssetForm } from "@/components/forms/asset-form";
 import { RequestHistoryRow } from "@/components/dashboard/request-history-row";
 import { getAssetForEditor, getDashboardData, requireOwner } from "@/lib/data";
 import type { AccessRequestStatus } from "@/lib/types";
+import { cn, getBaseUrl } from "@/lib/utils";
 
 export default async function EditAssetPage({
   params,
   searchParams,
 }: {
   params: Promise<{ assetId: string }>;
-  searchParams: Promise<{ history_limit?: string }>;
+  searchParams: Promise<{ history_limit?: string; saved?: string }>;
 }) {
   const owner = await requireOwner();
   const { assetId } = await params;
-  const { history_limit } = await searchParams;
+  const { history_limit, saved } = await searchParams;
 
   const data = await Promise.all([
     getDashboardData(owner.id),
@@ -42,9 +45,11 @@ export default async function EditAssetPage({
   const limit = history_limit === "all" ? allProcessed.length : 10;
   const processedRequests = allProcessed.slice(0, limit);
   const hasMoreHistory = allProcessed.length > limit;
+  const shareUrl = `${getBaseUrl()}/a/${asset.slug}`;
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 py-6">
+      <SaveSuccessToast open={saved === "1"} />
       <header className="space-y-6">
         <div className="flex items-center justify-between">
           <Link
@@ -55,19 +60,34 @@ export default async function EditAssetPage({
             Back to dashboard
           </Link>
 
-          <form id={deleteFormId} action={deleteAssetAction}>
-            <input type="hidden" name="asset_id" value={asset.id} />
-            <ConfirmSubmitButton
-              formId={deleteFormId}
-              triggerLabel="Delete Asset"
-              title="Delete this asset?"
-              description="This removes the asset and any associated stored files. This action cannot be undone."
-              confirmLabel="Delete"
-              triggerVariant="outline"
-              triggerClassName="h-9 px-4 text-xs font-bold uppercase tracking-wider text-red-600 border-red-100 bg-red-50/50 hover:bg-red-50 hover:text-red-700 transition-colors"
-              icon={<Trash2Icon className="size-3.5 mr-1.5" />}
-            />
-          </form>
+          <div className="flex items-center gap-2">
+            <Link
+              href={shareUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "cursor-pointer px-4 text-xs font-bold uppercase tracking-wider text-zinc-600",
+              )}
+            >
+              <ExternalLinkIcon className="size-3.5" />
+              Open URL
+            </Link>
+
+            <form id={deleteFormId} action={deleteAssetAction}>
+              <input type="hidden" name="asset_id" value={asset.id} />
+              <ConfirmSubmitButton
+                formId={deleteFormId}
+                triggerLabel="Delete Asset"
+                title="Delete this asset?"
+                description="This removes the asset and any associated stored files. This action cannot be undone."
+                confirmLabel="Delete"
+                triggerVariant="outline"
+                triggerClassName="h-9 px-4 text-xs font-bold uppercase tracking-wider text-red-600 border-red-100 bg-red-50/50 hover:bg-red-50 hover:text-red-700 transition-colors"
+                icon={<Trash2Icon className="size-3.5 mr-1.5" />}
+              />
+            </form>
+          </div>
         </div>
 
         <div className="space-y-4">

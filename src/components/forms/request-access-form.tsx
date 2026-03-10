@@ -54,7 +54,7 @@ export function RequestAccessForm({
         />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="reason" className="text-zinc-700 text-sm font-medium">Context</Label>
+        <Label htmlFor="reason" className="text-zinc-700 text-sm font-medium">Reason</Label>
         <Textarea
           id="reason"
           name="reason"

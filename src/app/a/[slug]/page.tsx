@@ -5,7 +5,6 @@ import { ClockIcon, FileKeyIcon, LinkIcon, ShieldCheckIcon } from "lucide-react"
 import { requestAccessAction } from "@/app/a/[slug]/actions";
 import { LogoMark } from "@/components/app/logo-mark";
 import { RequestAccessForm } from "@/components/forms/request-access-form";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPublicAssetBySlug } from "@/lib/data";
 import { formatRelativeWindow } from "@/lib/utils";
@@ -21,7 +20,7 @@ export async function generateMetadata({
   const asset = await getPublicAssetBySlug(slug);
 
   return {
-    title: asset?.name ?? "Protected Assets",
+    title: asset ? `${asset.name} | Protected Assets` : "Protected Assets",
   };
 }
 
@@ -58,9 +57,6 @@ export default async function ProtectedAssetPage({
           <LogoMark />
           <div className="space-y-6">
             <div className="space-y-2">
-              <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-zinc-200">
-                Protected Asset
-              </Badge>
               <h1 className="text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
                 {asset.name}
               </h1>
@@ -68,7 +64,7 @@ export default async function ProtectedAssetPage({
             
             <p className="text-base text-zinc-600 leading-relaxed">
               {asset.description ||
-                "This asset is protected. Submit your email and context to request access."}
+                "This asset is protected. Submit your email and reason to request access."}
             </p>
 
             <div className="space-y-4 pt-4">
@@ -110,8 +106,11 @@ export default async function ProtectedAssetPage({
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-zinc-900">Auto-Release</p>
-                    <p className="text-xs text-zinc-500 leading-relaxed">
-                      Fallback access releases in <strong>{formatRelativeWindow(asset.auto_approve_delay_seconds)}</strong>.
+                    <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium leading-relaxed text-amber-950">
+                      If owner doesn&apos;t approve or deny the request, the files will be automatically released to your inbox in{" "}
+                      <strong className="font-semibold">
+                        {formatRelativeWindow(asset.auto_approve_delay_seconds, { verbose: true })}
+                      </strong>.
                     </p>
                   </div>
                 </div>
@@ -135,7 +134,7 @@ export default async function ProtectedAssetPage({
       
       <footer className="mt-20 text-center">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-          Powered by Protected Assets
+          Powered by Protected Assets by Gan
         </p>
       </footer>
     </main>
