@@ -1,5 +1,4 @@
 import Link from "next/link";
-
 import { LayoutGridIcon, LogOutIcon, PlusIcon, Settings2Icon } from "lucide-react";
 
 import { signOutAction } from "@/app/auth/actions";
@@ -9,13 +8,12 @@ import { requireOwner } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 const navLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-white";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900";
 const ghostActionClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white/70";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutGridIcon },
-  { href: "/dashboard/assets/new", label: "New asset", icon: PlusIcon },
   { href: "/dashboard/settings", label: "Settings", icon: Settings2Icon },
 ];
 
@@ -27,11 +25,11 @@ export default async function DashboardLayout({
   await requireOwner();
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f3f8fb_0%,#eef2f8_45%,#f7f8fb_100%)]">
-      <div className="mx-auto flex max-w-7xl flex-col px-6 py-8 sm:px-8 lg:px-10">
-        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto flex max-w-7xl flex-col px-6 py-6 sm:px-8 lg:px-10">
+        <header className="mb-8 flex items-center justify-between border-b border-zinc-100 pb-6">
           <LogoMark />
-          <div className="flex flex-wrap items-center gap-3">
+          <nav className="flex items-center gap-2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -42,6 +40,7 @@ export default async function DashboardLayout({
                 {item.label}
               </Link>
             ))}
+            <div className="h-4 w-px bg-zinc-200 mx-2" />
             <form action={signOutAction}>
               <button
                 type="submit"
@@ -51,9 +50,9 @@ export default async function DashboardLayout({
                 Sign out
               </button>
             </form>
-          </div>
+          </nav>
         </header>
-        {children}
+        <main>{children}</main>
       </div>
     </div>
   );

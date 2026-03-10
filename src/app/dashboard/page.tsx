@@ -1,258 +1,259 @@
 import Link from "next/link";
-
-import { Clock4Icon, FileLock2Icon, FolderPlusIcon, Link2Icon, MailPlusIcon, XIcon } from "lucide-react";
+import { Clock4Icon, FileLock2Icon, FolderPlusIcon, Link2Icon, MailPlusIcon, XIcon, PlusIcon } from "lucide-react";
 
 import { createCollectionAction, deleteCollectionAction } from "@/app/dashboard/actions";
 import { ConfirmSubmitButton } from "@/components/app/confirm-submit-button";
 import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { RequestDecisionRow } from "@/components/dashboard/request-decision-row";
+import { RequestHistoryRow } from "@/components/dashboard/request-history-row";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { getDashboardData, requireOwner } from "@/lib/data";
-import { formatRelativeWindow, getBaseUrl } from "@/lib/utils";
+import { formatRelativeWindow, getBaseUrl, cn } from "@/lib/utils";
 
 const primaryLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800";
-const secondaryLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-50";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 shadow-sm";
 const ghostLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ group_id?: string; history_limit?: string }>;
+}) {
+  const { group_id, history_limit } = await searchParams;
   const owner = await requireOwner();
   const { groups, assets, pendingRequests, requests } = await getDashboardData(owner.id);
 
+  const activeGroup = group_id ? groups.find((g) => g.id === group_id) : null;
+  const filteredAssets = activeGroup 
+    ? assets.filter((a) => a.group_id === group_id) 
+    : assets;
+
   const stats = [
-    { label: "Protected assets", value: assets.length, icon: FileLock2Icon },
-    { label: "Pending requests", value: pendingRequests.length, icon: MailPlusIcon },
+    { label: "Assets", value: assets.length, icon: FileLock2Icon },
+    { label: "Pending", value: pendingRequests.length, icon: MailPlusIcon },
     {
-      label: "Approved requests",
+      label: "Approved",
       value: requests.filter((request) => request.status !== "pending" && request.status !== "denied").length,
       icon: Clock4Icon,
     },
   ];
 
-  return (
-    <div className="space-y-8">
-      <section className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-white/60 bg-white/92 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
-          <CardHeader>
-            <Badge className="w-fit rounded-full border border-sky-200 bg-sky-50 text-slate-700">
-              Release control center
-            </Badge>
-            <CardTitle className="text-3xl tracking-tight text-slate-950">
-              Protected assets, one clean queue.
-            </CardTitle>
-            <CardDescription className="max-w-2xl text-sm leading-7 text-slate-600">
-              Create locked share links, capture requester context, then approve instantly or let auto-release policies take over.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
-            {stats.map((stat) => (
-              <div key={stat.label} className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
-                <stat.icon className="size-4 text-slate-500" />
-                <p className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">
-                  {stat.value}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">{stat.label}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+  const limit = history_limit === "all" ? requests.length : 5;
+  const allProcessed = requests.filter((request) => request.status !== "pending");
+  const processedRequests = allProcessed
+    .slice(0, limit)
+    .map((request) => ({
+      ...request,
+      asset: assets.find((asset) => asset.id === request.asset_id) ?? null,
+    }));
 
-        <Card className="border-white/60 bg-white/92 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
-          <CardHeader>
-            <CardTitle className="text-xl tracking-tight text-slate-950">Collections</CardTitle>
-            <CardDescription className="text-sm text-slate-600">
-              Organize assets into simple folders for faster triage.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form action={createCollectionAction} className="flex gap-3">
+  const hasMoreHistory = allProcessed.length > limit;
+
+  return (
+    <div className="space-y-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-950">Dashboard</h1>
+          <p className="text-sm text-zinc-500 mt-1">Manage your protected assets and access requests.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/assets/new" className={primaryLinkClass}>
+            <PlusIcon className="size-4" />
+            New Asset
+          </Link>
+        </div>
+      </header>
+
+      <section className="grid gap-6 sm:grid-cols-3">
+        {stats.map((stat) => (
+          <Card key={stat.label} className="border-zinc-200/60 shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-zinc-500">{stat.label}</p>
+                <stat.icon className="size-4 text-zinc-400" />
+              </div>
+              <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">{stat.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <div className="grid gap-12 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-12">
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
+                {activeGroup ? `Assets in ${activeGroup.name}` : "Recent Assets"}
+              </h2>
+              <Link href="/dashboard" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
+                View all
+              </Link>
+            </div>
+            <div className="grid gap-4">
+              {filteredAssets.length ? (
+                filteredAssets.map((asset) => {
+                  const shareUrl = `${getBaseUrl()}/a/${asset.slug}`;
+                  return (
+                    <Card key={asset.id} className="border-zinc-200/60 shadow-sm hover:border-zinc-300 transition-colors">
+                      <CardContent className="p-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-zinc-900">{asset.name}</h3>
+                              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider py-0 h-4 rounded-sm border-zinc-200 text-zinc-500">
+                                {asset.kind}
+                              </Badge>
+                              {asset.auto_approve_enabled && (
+                                <Badge className="text-[10px] font-bold uppercase tracking-wider py-0 h-4 rounded-sm bg-zinc-100 text-zinc-600 border-none">
+                                  Auto
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-zinc-500 line-clamp-1">{asset.description || "No description"}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CopyLinkButton value={shareUrl} />
+                            <Link 
+                              href={`/dashboard/assets/${asset.id}`} 
+                              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer")}
+                            >
+                              Edit
+                            </Link>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : (
+                <div className="rounded-lg border border-dashed border-zinc-200 p-12 text-center">
+                  <p className="text-sm text-zinc-500">No assets created yet.</p>
+                  <Link href="/dashboard/assets/new" className="mt-4 inline-flex text-sm font-medium text-zinc-900 underline underline-offset-4">
+                    Create your first asset
+                  </Link>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Pending Approvals</h2>
+            <div className="space-y-3">
+              {pendingRequests.length ? (
+                pendingRequests.map((request) => (
+                  <RequestDecisionRow
+                    key={request.id}
+                    requestId={request.id}
+                    requesterEmail={request.requester_email}
+                    assetName={request.asset.name}
+                    reason={request.reason}
+                    createdAt={request.created_at}
+                    autoApproveLabel={
+                      request.asset.auto_approve_enabled
+                        ? formatRelativeWindow(request.asset.auto_approve_delay_seconds)
+                        : null
+                    }
+                  />
+                ))
+              ) : (
+                <div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-6 text-center">
+                  <p className="text-sm text-zinc-500">All caught up! No pending requests.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold tracking-tight text-zinc-900">History</h2>
+            <div className="space-y-3">
+              {processedRequests.length ? (
+                <>
+                  {processedRequests.map((request) => (
+                    <RequestHistoryRow
+                      key={request.id}
+                      requesterEmail={request.requester_email}
+                      assetName={request.asset?.name}
+                      reason={request.reason}
+                      status={request.status as any}
+                      createdAt={request.created_at}
+                      processedAt={request.released_at || request.denied_at}
+                    />
+                  ))}
+                  {hasMoreHistory && (
+                    <div className="pt-2 text-center">
+                      <Link 
+                        href={`/dashboard?history_limit=all${group_id ? `&group_id=${group_id}` : ""}`}
+                        className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors"
+                      >
+                        Show more history
+                      </Link>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-lg border border-zinc-50 p-6 text-center">
+                  <p className="text-sm text-zinc-400 italic">No request history yet.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <aside className="space-y-12">
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Collections</h2>
+            <form action={createCollectionAction} className="flex flex-col gap-2">
               <input
                 name="name"
-                placeholder="Investor materials"
-                className="h-10 flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 text-sm outline-none"
+                placeholder="New collection..."
+                className="h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-1 focus:ring-zinc-400"
                 required
               />
-              <button
-                type="submit"
-                className={primaryLinkClass}
-              >
-                <FolderPlusIcon className="size-4" />
+              <button type="submit" className={primaryLinkClass}>
+                Create
               </button>
             </form>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-1">
               {groups.length ? (
                 groups.map((group) => (
-                  <form key={group.id} id={`delete-collection-${group.id}`} action={deleteCollectionAction}>
-                    <input type="hidden" name="group_id" value={group.id} />
-                    <Badge
-                      variant="outline"
-                      className="flex items-center gap-2 rounded-full border-slate-200 px-3 py-1"
+                  <div key={group.id} className={cn(
+                    "group flex items-center justify-between rounded-md px-2 py-1.5 transition-colors",
+                    group_id === group.id ? "bg-zinc-100" : "hover:bg-zinc-50"
+                  )}>
+                    <Link 
+                      href={`/dashboard?group_id=${group.id}`}
+                      className={cn(
+                        "text-sm font-medium transition-colors",
+                        group_id === group.id ? "text-zinc-900" : "text-zinc-600 hover:text-zinc-900"
+                      )}
                     >
-                      <span>{group.name}</span>
+                      {group.name}
+                    </Link>
+                    <form action={deleteCollectionAction} id={`delete-collection-${group.id}`}>
+                      <input type="hidden" name="group_id" value={group.id} />
                       <ConfirmSubmitButton
                         formId={`delete-collection-${group.id}`}
                         triggerLabel=""
-                        title={`Delete "${group.name}"?`}
-                        description="Assets in this collection will stay intact and simply become unassigned."
-                        confirmLabel="Delete collection"
+                        title="Delete collection?"
+                        description="Assets will remain intact."
+                        confirmLabel="Delete"
                         triggerVariant="ghost"
-                        triggerClassName="size-5 rounded-full p-0 text-slate-400 hover:bg-transparent hover:text-slate-900"
+                        triggerClassName="opacity-0 group-hover:opacity-100 size-6 p-0 text-zinc-400 hover:text-zinc-900 transition-opacity"
                         icon={<XIcon className="size-3.5" />}
                       />
-                    </Badge>
-                  </form>
+                    </form>
+                  </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">No collections yet.</p>
+                <p className="text-xs text-zinc-400 italic px-2">No collections yet.</p>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Your assets</h2>
-            <p className="text-sm text-slate-600">Edit settings, inspect request activity, and copy protected links.</p>
-          </div>
-          <Link
-            href="/dashboard/assets/new"
-            className={primaryLinkClass}
-          >
-            New asset
-          </Link>
-        </div>
-        <div className="grid gap-5 xl:grid-cols-2">
-          {assets.length ? (
-            assets.map((asset) => {
-              const shareUrl = `${getBaseUrl()}/a/${asset.slug}`;
-              return (
-                <Card
-                  key={asset.id}
-                  className="border-white/60 bg-white/92 py-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]"
-                >
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" className="rounded-full border-slate-200">
-                            {asset.kind === "link" ? "Link" : "Files"}
-                          </Badge>
-                          {asset.group ? (
-                            <Badge variant="secondary" className="rounded-full">
-                              {asset.group.name}
-                            </Badge>
-                          ) : null}
-                          {asset.auto_approve_enabled ? (
-                            <Badge className="rounded-full border border-sky-200 bg-sky-50 text-slate-700">
-                              Auto release {formatRelativeWindow(asset.auto_approve_delay_seconds)}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <CardTitle className="mt-3 text-xl tracking-tight text-slate-950">
-                          {asset.name}
-                        </CardTitle>
-                        <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-                          {asset.description || "No description added yet."}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Requests</p>
-                        <p className="mt-3 text-2xl font-semibold text-slate-950">{asset.requestCount}</p>
-                      </div>
-                      <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Pending</p>
-                        <p className="mt-3 text-2xl font-semibold text-slate-950">{asset.pendingCount}</p>
-                      </div>
-                      <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Bundle</p>
-                        <p className="mt-3 text-sm font-medium text-slate-950">
-                          {asset.kind === "link" ? "Direct URL" : `${asset.files.length} files`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <CopyLinkButton value={shareUrl} />
-                      <Link
-                        href={`/dashboard/assets/${asset.id}`}
-                        className={secondaryLinkClass}
-                      >
-                        Edit asset
-                      </Link>
-                      <Link
-                        href={shareUrl}
-                        className={ghostLinkClass}
-                      >
-                        <Link2Icon className="size-4" />
-                        Open public page
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          ) : (
-            <Card className="border-white/60 bg-white/92 py-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
-              <CardHeader>
-                <CardTitle className="text-xl tracking-tight text-slate-950">No assets yet</CardTitle>
-                <CardDescription className="text-sm text-slate-600">
-                  Create your first protected link or document bundle to start collecting requests.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link
-                  href="/dashboard/assets/new"
-                  className={primaryLinkClass}
-                >
-                  Create your first asset
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Pending approvals</h2>
-          <p className="text-sm text-slate-600">
-            Review requests in one pass. Auto-release windows are shown inline.
-          </p>
-        </div>
-        <div className="space-y-4">
-          {pendingRequests.length ? (
-            pendingRequests.map((request) => (
-              <RequestDecisionRow
-                key={request.id}
-                requestId={request.id}
-                requesterEmail={request.requester_email}
-                assetName={request.asset.name}
-                reason={request.reason}
-                createdAt={request.created_at}
-                autoApproveLabel={
-                  request.asset.auto_approve_enabled
-                    ? formatRelativeWindow(request.asset.auto_approve_delay_seconds)
-                    : null
-                }
-              />
-            ))
-          ) : (
-            <Card className="border-white/60 bg-white/92 py-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
-              <CardContent className="text-sm text-slate-600">
-                No pending requests. New inbound requests will appear here.
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </section>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

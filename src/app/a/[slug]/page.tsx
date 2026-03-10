@@ -1,9 +1,7 @@
 import { notFound } from "next/navigation";
-
-import { Clock4Icon, FileKey2Icon, Link2Icon, ShieldCheckIcon } from "lucide-react";
+import { ClockIcon, FileKeyIcon, LinkIcon, ShieldCheckIcon } from "lucide-react";
 
 import { requestAccessAction } from "@/app/a/[slug]/actions";
-import { AmbientOrbits } from "@/components/app/ambient-orbits";
 import { LogoMark } from "@/components/app/logo-mark";
 import { RequestAccessForm } from "@/components/forms/request-access-form";
 import { Badge } from "@/components/ui/badge";
@@ -26,61 +24,93 @@ export default async function ProtectedAssetPage({
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#dff4ff,transparent_30%),linear-gradient(180deg,#f7fbff_0%,#eef2f8_45%,#f7f8fb_100%)] px-6 py-8 sm:px-8">
-      <AmbientOrbits />
-      <div className="relative mx-auto max-w-5xl">
-        <LogoMark />
-        <div className="grid min-h-[calc(100vh-6rem)] items-center gap-8 lg:grid-cols-[1fr_0.92fr]">
-          <div className="max-w-xl">
-            <Badge className="rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-[11px] uppercase tracking-[0.3em] text-slate-600">
-              protected access
-            </Badge>
-            <h1 className="mt-6 text-5xl font-semibold tracking-tight text-slate-950">
-              {asset.name}
-            </h1>
-            <p className="mt-5 text-lg leading-8 text-slate-600">
+    <main className="min-h-screen bg-white text-zinc-950 flex flex-col items-center justify-center p-6 sm:p-12">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+      
+      <div className="relative w-full max-w-4xl grid gap-12 lg:grid-cols-2 items-center">
+        <div className="space-y-8">
+          <LogoMark />
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-zinc-200">
+                Protected Asset
+              </Badge>
+              <h1 className="text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
+                {asset.name}
+              </h1>
+            </div>
+            
+            <p className="text-base text-zinc-600 leading-relaxed">
               {asset.description ||
                 "This asset is protected. Submit your email and context to request access."}
             </p>
-            <div className="mt-8 space-y-3">
-              <div className="flex items-center gap-3 rounded-[1.5rem] border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
-                {asset.kind === "link" ? (
-                  <Link2Icon className="size-4 text-slate-500" />
-                ) : (
-                  <FileKey2Icon className="size-4 text-slate-500" />
-                )}
-                {asset.kind === "link"
-                  ? "When approved, the protected link is sent to your inbox."
-                  : "When approved, signed document download links are sent to your inbox."}
-              </div>
-              <div className="flex items-center gap-3 rounded-[1.5rem] border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
-                <ShieldCheckIcon className="size-4 text-slate-500" />
-                Requests are reviewed by the owner before release.
-              </div>
-              {asset.auto_approve_enabled ? (
-                <div className="flex items-center gap-3 rounded-[1.5rem] border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
-                  <Clock4Icon className="size-4 text-slate-500" />
-                  If the owner doesn&apos;t respond, access auto-releases in{" "}
-                  <strong>{formatRelativeWindow(asset.auto_approve_delay_seconds)}</strong>.
+
+            <div className="space-y-4 pt-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 size-8 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-400">
+                  {asset.kind === "link" ? (
+                    <LinkIcon className="size-4" />
+                  ) : (
+                    <FileKeyIcon className="size-4" />
+                  )}
                 </div>
-              ) : null}
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">Secure Delivery</p>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    {asset.kind === "link"
+                      ? "Approved links are sent directly to your inbox."
+                      : "Signed document links are sent to your inbox upon approval."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="mt-1 size-8 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-400">
+                  <ShieldCheckIcon className="size-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">Manual Review</p>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    The owner will review your request before granting access.
+                  </p>
+                </div>
+              </div>
+
+              {asset.auto_approve_enabled && (
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 size-8 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-400">
+                    <ClockIcon className="size-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-900">Auto-Release</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">
+                      Fallback access releases in <strong>{formatRelativeWindow(asset.auto_approve_delay_seconds)}</strong>.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-          <Card className="border-white/60 bg-white/88 py-6 shadow-[0_40px_90px_rgba(15,23,42,0.1)] backdrop-blur-md">
-            <CardHeader>
-              <CardTitle className="text-2xl tracking-tight text-slate-950">
-                Request access
-              </CardTitle>
-              <CardDescription className="text-sm leading-6 text-slate-600">
-                Your request goes directly to the asset owner, along with your reason for access.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RequestAccessForm slug={slug} action={requestAccessAction} />
-            </CardContent>
-          </Card>
         </div>
+
+        <Card className="border-zinc-200 shadow-xl sm:p-4">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-xl font-bold">Request Access</CardTitle>
+            <CardDescription className="text-sm">
+              Provide your details to request this protected asset.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RequestAccessForm slug={slug} action={requestAccessAction} />
+          </CardContent>
+        </Card>
       </div>
+      
+      <footer className="mt-20 text-center">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+          Powered by Protected Assets
+        </p>
+      </footer>
     </main>
   );
 }

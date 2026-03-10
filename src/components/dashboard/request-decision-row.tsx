@@ -1,4 +1,4 @@
-import { Clock4Icon, MailIcon } from "lucide-react";
+import { ClockIcon, MailIcon, CheckIcon, XIcon } from "lucide-react";
 
 import { approveRequestAction, denyRequestAction } from "@/app/dashboard/actions";
 import { SubmitButton } from "@/components/app/submit-button";
@@ -20,39 +20,55 @@ export function RequestDecisionRow({
   autoApproveLabel: string | null;
 }) {
   return (
-    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_20px_45px_rgba(15,23,42,0.05)]">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="rounded-full border-slate-200 text-slate-600">
+    <div className="group rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:border-zinc-300">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex-1 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+             <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider py-0 h-5 rounded-sm border-zinc-200 text-zinc-500">
               {assetName}
             </Badge>
-            {autoApproveLabel ? (
-              <Badge variant="secondary" className="rounded-full">
-                Auto release in {autoApproveLabel}
+            {autoApproveLabel && (
+              <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider py-0 h-5 rounded-sm bg-orange-50 text-orange-600 border-none">
+                Auto-release: {autoApproveLabel}
               </Badge>
-            ) : null}
+            )}
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 ml-auto sm:ml-0">
+              {new Date(createdAt).toLocaleDateString()}
+            </span>
           </div>
-          <p className="flex items-center gap-2 text-sm font-medium text-slate-950">
-            <MailIcon className="size-4 text-slate-500" />
-            {requesterEmail}
-          </p>
-          <p className="max-w-2xl text-sm leading-6 text-slate-600">{reason}</p>
-          <p className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-            <Clock4Icon className="size-3.5" />
-            {new Date(createdAt).toLocaleString()}
-          </p>
+          
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+              <MailIcon className="size-3.5 text-zinc-400" />
+              {requesterEmail}
+            </div>
+            <p className="text-sm text-zinc-600 leading-relaxed italic border-l-2 border-zinc-100 pl-4">
+              &ldquo;{reason}&rdquo;
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <form action={denyRequestAction}>
+
+        <div className="flex items-center gap-2 sm:self-center">
+          <form action={denyRequestAction} className="flex-1 sm:flex-initial">
             <input type="hidden" name="request_id" value={requestId} />
-            <SubmitButton variant="outline" pendingLabel="Declining...">
+            <SubmitButton 
+              variant="outline" 
+              className="w-full h-9 px-4 text-xs font-bold uppercase tracking-wider text-zinc-500 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900" 
+              pendingLabel="Declining..."
+            >
+              <XIcon className="size-3 mr-1.5" />
               Decline
             </SubmitButton>
           </form>
-          <form action={approveRequestAction}>
+          <form action={approveRequestAction} className="flex-1 sm:flex-initial">
             <input type="hidden" name="request_id" value={requestId} />
-            <SubmitButton pendingLabel="Approving...">Approve</SubmitButton>
+            <SubmitButton 
+              className="w-full h-9 px-4 text-xs font-bold uppercase tracking-wider bg-zinc-900 hover:bg-zinc-800 shadow-sm" 
+              pendingLabel="Approving..."
+            >
+              <CheckIcon className="size-3 mr-1.5" />
+              Approve
+            </SubmitButton>
           </form>
         </div>
       </div>

@@ -1,31 +1,35 @@
+"use client";
+
 import Link from "next/link";
+import Image from "next/image";
+import { motion } from "framer-motion";
 
 export function LogoMark({ compact = false }: { compact?: boolean }) {
   return (
     <Link
       href="/"
-      className="inline-flex cursor-pointer items-center gap-3 rounded-full border border-white/10 bg-white/70 px-3 py-2 text-sm font-medium tracking-tight text-slate-900 backdrop-blur-sm"
+      className="inline-flex cursor-pointer items-center gap-2.5 rounded-md py-1 text-sm font-bold tracking-tight text-zinc-900"
     >
-      <span className="relative flex size-8 items-center justify-center overflow-hidden rounded-full bg-slate-950 text-white">
-        <svg
-          viewBox="0 0 48 48"
-          className="absolute inset-0 size-full"
-          aria-hidden="true"
+      <motion.div 
+        className="flex size-8 items-center justify-center rounded-lg bg-zinc-900 overflow-hidden"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="relative size-full p-1.5"
         >
-          <path
-            d="M8 26C8 14.954 16.954 6 28 6h12v12c0 11.046-8.954 20-20 20H8V26Z"
-            fill="url(#logo-gradient)"
+          <Image
+            src="/logo.png"
+            alt="Protected Assets Logo"
+            fill
+            className="object-contain"
           />
-          <defs>
-            <linearGradient id="logo-gradient" x1="8" y1="6" x2="40" y2="38">
-              <stop stopColor="#7dd3fc" />
-              <stop offset="1" stopColor="#f97316" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <span className="relative text-xs font-semibold">PA</span>
-      </span>
-      {!compact ? <span>Protected Assets</span> : null}
+        </motion.div>
+      </motion.div>
+      {!compact ? <span className="uppercase tracking-[0.1em]">Protected Assets</span> : null}
     </Link>
   );
 }
