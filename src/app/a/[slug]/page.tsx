@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ClockIcon, FileKeyIcon, LinkIcon, ShieldCheckIcon } from "lucide-react";
 
@@ -10,6 +11,19 @@ import { getPublicAssetBySlug } from "@/lib/data";
 import { formatRelativeWindow } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const asset = await getPublicAssetBySlug(slug);
+
+  return {
+    title: asset?.name ?? "Protected Assets",
+  };
+}
 
 export default async function ProtectedAssetPage({
   params,
