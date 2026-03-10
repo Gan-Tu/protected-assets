@@ -11,7 +11,11 @@ import {
   sendRequesterDeniedEmail,
   sendRequesterReleaseEmail,
 } from "@/lib/notifications";
-import { scheduleAutoRelease } from "@/lib/qstash";
+import {
+  cancelAutoRelease,
+  cancelAutoReleaseMessages,
+  scheduleAutoRelease,
+} from "@/lib/qstash";
 import {
   createAdminSupabaseClient,
   createServerSupabaseClient,
@@ -381,13 +385,24 @@ export async function saveAsset(ownerId: string, formData: FormData, assetId?: s
 
 export async function deleteAsset(ownerId: string, assetId: string) {
   const admin = createAdminSupabaseClient();
-  const { data: files } = await admin
-    .from("asset_files")
-    .select("storage_path")
-    .eq("asset_id", assetId)
-    .eq("owner_id", ownerId);
+  const [{ data: files }, { data: pendingRequests }] = await Promise.all([
+    admin
+      .from("asset_files")
+      .select("storage_path")
+      .eq("asset_id", assetId)
+      .eq("owner_id", ownerId),
+    admin
+      .from("access_requests")
+      .select("qstash_message_id")
+      .eq("asset_id", assetId)
+      .eq("owner_id", ownerId)
+      .eq("status", "pending"),
+  ]);
 
   await deleteStoredFiles((files ?? []).map((file) => file.storage_path));
+  await cancelAutoReleaseMessages(
+    (pendingRequests ?? []).map((request) => request.qstash_message_id),
+  );
   await admin.from("assets").delete().eq("id", assetId).eq("owner_id", ownerId);
 
   revalidatePath("/dashboard");
@@ -492,6 +507,18 @@ export async function submitAccessRequest(formData: FormData) {
           scheduleResult.reason ?? "Unable to schedule auto-release.",
         );
       }
+
+      const { error: requestUpdateError } = await admin
+        .from("access_requests")
+        .update({ qstash_message_id: scheduleResult.messageId })
+        .eq("id", request.id)
+        .eq("status", "pending");
+
+      if (requestUpdateError) {
+        await cancelAutoRelease(scheduleResult.messageId);
+        await admin.from("access_requests").delete().eq("id", request.id);
+        throw requestUpdateError;
+      }
     } else {
       await releaseRequest(request.id, "auto_approved");
     }
@@ -583,11 +610,16 @@ export async function releaseRequest(
       status: releaseMode,
       approved_at: new Date().toISOString(),
       released_at: new Date().toISOString(),
+      qstash_message_id: null,
     })
     .eq("id", requestId)
     .eq("status", "pending");
 
   if (updateError) throw updateError;
+
+  if (releaseMode === "approved") {
+    await cancelAutoRelease(request.qstash_message_id);
+  }
 
   const shareUrl = `${getBaseUrl()}/a/${asset.slug}`;
 
@@ -629,8 +661,12 @@ export async function denyRequest(ownerId: string, requestId: string) {
     .update({
       status: "denied" satisfies AccessRequestStatus,
       denied_at: new Date().toISOString(),
+      qstash_message_id: null,
     })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", "pending");
+
+  await cancelAutoRelease(request.qstash_message_id);
 
   await sendRequesterDeniedEmail({
     requestId,
@@ -640,4 +676,26 @@ export async function denyRequest(ownerId: string, requestId: string) {
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/assets/${request.assets.id}`);
+}
+
+export async function clearRequestHistory(ownerId: string, assetId?: string) {
+  const admin = createAdminSupabaseClient();
+  let query = admin
+    .from("access_requests")
+    .delete()
+    .eq("owner_id", ownerId)
+    .in("status", ["approved", "auto_approved", "denied"]);
+
+  if (assetId) {
+    query = query.eq("asset_id", assetId);
+  }
+
+  const { error } = await query;
+  if (error) throw error;
+
+  revalidatePath("/dashboard");
+
+  if (assetId) {
+    revalidatePath(`/dashboard/assets/${assetId}`);
+  }
 }

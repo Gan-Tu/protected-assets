@@ -23,7 +23,7 @@ export default function SignInPage() {
           </div>
           <AuthForm
             title="Welcome back"
-            description="Use email + password or connect with Google/GitHub to get back to your approval queue."
+            description="Use your email and password to get back to your approval queue."
             action={signInAction}
             mode="sign-in"
           />

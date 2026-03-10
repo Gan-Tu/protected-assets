@@ -89,12 +89,16 @@ create table if not exists public.access_requests (
   requester_email text not null,
   reason text not null,
   status public.request_status not null default 'pending',
+  qstash_message_id text,
   decision_note text,
   approved_at timestamptz,
   denied_at timestamptz,
   released_at timestamptz,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.access_requests
+add column if not exists qstash_message_id text;
 
 create index if not exists asset_groups_owner_idx on public.asset_groups (owner_id);
 create index if not exists assets_owner_idx on public.assets (owner_id);

@@ -2,12 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeftIcon, Trash2Icon } from "lucide-react";
 
-import { deleteAssetAction, upsertAssetAction } from "@/app/dashboard/actions";
+import {
+  clearRequestHistoryAction,
+  deleteAssetAction,
+  upsertAssetAction,
+} from "@/app/dashboard/actions";
 import { ConfirmSubmitButton } from "@/components/app/confirm-submit-button";
 import { Badge } from "@/components/ui/badge";
 import { AssetForm } from "@/components/forms/asset-form";
 import { RequestHistoryRow } from "@/components/dashboard/request-history-row";
 import { getAssetForEditor, getDashboardData, requireOwner } from "@/lib/data";
+import type { AccessRequestStatus } from "@/lib/types";
 
 export default async function EditAssetPage({
   params,
@@ -31,6 +36,7 @@ export default async function EditAssetPage({
 
   const [{ groups }, { asset, files, requests }] = data;
   const deleteFormId = `delete-asset-${asset.id}`;
+  const clearHistoryFormId = `clear-request-history-${asset.id}`;
 
   const allProcessed = requests.filter((request) => request.status !== "pending");
   const limit = history_limit === "all" ? allProcessed.length : 10;
@@ -86,9 +92,25 @@ export default async function EditAssetPage({
 
       {processedRequests.length > 0 && (
         <section className="pt-12 border-t border-zinc-100 space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Request History</h2>
-            <p className="text-sm text-zinc-500">The most recent approvals and denials for this asset.</p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Request History</h2>
+              <p className="text-sm text-zinc-500">The most recent approvals and denials for this asset.</p>
+            </div>
+            <form id={clearHistoryFormId} action={clearRequestHistoryAction}>
+              <input type="hidden" name="asset_id" value={asset.id} />
+              <input type="hidden" name="redirect_to" value={`/dashboard/assets/${asset.id}`} />
+              <ConfirmSubmitButton
+                formId={clearHistoryFormId}
+                triggerLabel="Clear History"
+                title="Clear this asset history?"
+                description="This removes all approved, auto-approved, and denied requests for this asset."
+                confirmLabel="Clear history"
+                triggerVariant="outline"
+                triggerClassName="h-9 px-4 text-xs font-bold uppercase tracking-wider text-zinc-500 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900"
+                icon={<Trash2Icon className="size-3.5 mr-1.5" />}
+              />
+            </form>
           </div>
           <div className="space-y-3">
             {processedRequests.map((request) => (
@@ -96,7 +118,7 @@ export default async function EditAssetPage({
                 key={request.id}
                 requesterEmail={request.requester_email}
                 reason={request.reason}
-                status={request.status as any}
+                status={request.status as AccessRequestStatus}
                 createdAt={request.created_at}
                 processedAt={request.released_at || request.denied_at}
               />

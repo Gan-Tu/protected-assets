@@ -2,16 +2,12 @@ import Link from "next/link";
 import { ArrowRightIcon, Clock3Icon, FolderLockIcon, SparklesIcon, ChevronRightIcon } from "lucide-react";
 
 import { LogoMark } from "@/components/app/logo-mark";
-import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLandingUser } from "@/lib/data";
-import { getBaseUrl } from "@/lib/utils";
 
 const primaryLinkClass =
   "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 shadow-sm";
-const secondaryLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 shadow-sm";
 
 const features = [
   {
@@ -33,7 +29,6 @@ const features = [
 
 export default async function Home() {
   const user = await getLandingUser();
-  const demoUrl = `${getBaseUrl()}/a/investor-room`;
 
   return (
     <main className="relative min-h-screen bg-white text-zinc-950 selection:bg-zinc-100">
@@ -69,7 +64,6 @@ export default async function Home() {
               {user ? "Go to Dashboard" : "Create account"}
               <ArrowRightIcon className="size-4" />
             </Link>
-            <CopyLinkButton value={demoUrl} />
           </div>
         </section>
 

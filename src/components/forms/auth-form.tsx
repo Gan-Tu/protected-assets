@@ -6,12 +6,9 @@ import { LockKeyholeIcon, ChevronRightIcon } from "lucide-react";
 
 import { SubmitButton } from "@/components/app/submit-button";
 import type { AuthActionState } from "@/app/auth/actions";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { OAuthButtons } from "@/components/forms/oauth-buttons";
-import { cn } from "@/lib/utils";
 
 const initialState: AuthActionState = {};
 
@@ -42,17 +39,6 @@ export function AuthForm({
         </div>
       </CardHeader>
       <CardContent className="space-y-6 pt-8">
-        <OAuthButtons />
-        
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-zinc-100" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-zinc-400 font-bold tracking-wider">or continue with email</span>
-          </div>
-        </div>
-
         <form action={formAction} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-zinc-700 text-xs font-bold uppercase tracking-wider">Email</Label>

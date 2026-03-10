@@ -1,22 +1,24 @@
 import Link from "next/link";
-import { Clock4Icon, FileLock2Icon, FolderPlusIcon, Link2Icon, MailPlusIcon, XIcon, PlusIcon } from "lucide-react";
+import { Clock4Icon, FileLock2Icon, MailPlusIcon, Trash2Icon, XIcon, PlusIcon } from "lucide-react";
 
-import { createCollectionAction, deleteCollectionAction } from "@/app/dashboard/actions";
+import {
+  clearRequestHistoryAction,
+  createCollectionAction,
+  deleteCollectionAction,
+} from "@/app/dashboard/actions";
 import { ConfirmSubmitButton } from "@/components/app/confirm-submit-button";
 import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { RequestDecisionRow } from "@/components/dashboard/request-decision-row";
 import { RequestHistoryRow } from "@/components/dashboard/request-history-row";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { getDashboardData, requireOwner } from "@/lib/data";
+import type { AccessRequestStatus } from "@/lib/types";
 import { formatRelativeWindow, getBaseUrl, cn } from "@/lib/utils";
 
 const primaryLinkClass =
   "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 shadow-sm";
-const ghostLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900";
-
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -51,6 +53,8 @@ export default async function DashboardPage({
     }));
 
   const hasMoreHistory = allProcessed.length > limit;
+  const clearHistoryFormId = "clear-request-history";
+  const dashboardRedirect = group_id ? `/dashboard?group_id=${group_id}` : "/dashboard";
 
   return (
     <div className="space-y-10">
@@ -167,7 +171,24 @@ export default async function DashboardPage({
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold tracking-tight text-zinc-900">History</h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-xl font-semibold tracking-tight text-zinc-900">History</h2>
+              {processedRequests.length > 0 ? (
+                <form id={clearHistoryFormId} action={clearRequestHistoryAction}>
+                  <input type="hidden" name="redirect_to" value={dashboardRedirect} />
+                  <ConfirmSubmitButton
+                    formId={clearHistoryFormId}
+                    triggerLabel="Clear History"
+                    title="Clear request history?"
+                    description="This removes all approved, auto-approved, and denied requests from your dashboard history."
+                    confirmLabel="Clear history"
+                    triggerVariant="outline"
+                    triggerClassName="h-9 px-4 text-xs font-bold uppercase tracking-wider text-zinc-500 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900"
+                    icon={<Trash2Icon className="size-3.5 mr-1.5" />}
+                  />
+                </form>
+              ) : null}
+            </div>
             <div className="space-y-3">
               {processedRequests.length ? (
                 <>
@@ -177,7 +198,7 @@ export default async function DashboardPage({
                       requesterEmail={request.requester_email}
                       assetName={request.asset?.name}
                       reason={request.reason}
-                      status={request.status as any}
+                      status={request.status as AccessRequestStatus}
                       createdAt={request.created_at}
                       processedAt={request.released_at || request.denied_at}
                     />

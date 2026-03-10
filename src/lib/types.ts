@@ -56,6 +56,7 @@ export interface AccessRequest {
   requester_email: string;
   reason: string;
   status: AccessRequestStatus;
+  qstash_message_id: string | null;
   decision_note: string | null;
   approved_at: string | null;
   denied_at: string | null;

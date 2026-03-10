@@ -23,7 +23,7 @@ export default function SignUpPage() {
           </div>
           <AuthForm
             title="Create your workspace"
-            description="Use credentials or a social provider. Phone number and notification settings can be added in account settings after signup."
+            description="Create your account with email and password. Phone number and notification settings can be added in account settings after signup."
             action={signUpAction}
             mode="sign-up"
           />

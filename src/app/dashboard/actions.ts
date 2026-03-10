@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import {
+  clearRequestHistory,
   createAssetGroup,
   deleteAsset,
   deleteAssetGroup,
@@ -76,6 +77,17 @@ export async function denyRequestAction(formData: FormData) {
   const requestId = String(formData.get("request_id") ?? "");
   await denyRequest(owner.id, requestId);
   redirect("/dashboard");
+}
+
+export async function clearRequestHistoryAction(formData: FormData) {
+  const owner = await requireOwner();
+  const assetId = String(formData.get("asset_id") ?? "").trim() || undefined;
+  const redirectTo =
+    String(formData.get("redirect_to") ?? "").trim() ||
+    (assetId ? `/dashboard/assets/${assetId}` : "/dashboard");
+
+  await clearRequestHistory(owner.id, assetId);
+  redirect(redirectTo);
 }
 
 export async function updateSettingsAction(
