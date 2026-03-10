@@ -68,14 +68,16 @@ export async function deleteAssetAction(formData: FormData) {
 export async function approveRequestAction(formData: FormData) {
   const owner = await requireOwner();
   const requestId = String(formData.get("request_id") ?? "");
-  await releaseRequest(requestId, "approved", owner.id);
+  const decisionNote = String(formData.get("decision_note") ?? "");
+  await releaseRequest(requestId, "approved", owner.id, decisionNote);
   redirect("/dashboard");
 }
 
 export async function denyRequestAction(formData: FormData) {
   const owner = await requireOwner();
   const requestId = String(formData.get("request_id") ?? "");
-  await denyRequest(owner.id, requestId);
+  const decisionNote = String(formData.get("decision_note") ?? "");
+  await denyRequest(owner.id, requestId, decisionNote);
   redirect("/dashboard");
 }
 

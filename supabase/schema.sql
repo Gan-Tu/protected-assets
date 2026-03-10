@@ -38,6 +38,7 @@ create table if not exists public.assets (
   link_url text,
   auto_approve_enabled boolean not null default false,
   auto_approve_delay_seconds integer not null default 0,
+  auto_approve_note text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -70,6 +71,9 @@ alter column auto_approve_delay_seconds set default 0;
 alter table public.assets
 alter column auto_approve_delay_seconds set not null;
 
+alter table public.assets
+add column if not exists auto_approve_note text;
+
 create table if not exists public.asset_files (
   id uuid primary key default gen_random_uuid(),
   asset_id uuid not null references public.assets (id) on delete cascade,
@@ -81,6 +85,26 @@ create table if not exists public.asset_files (
   sort_order integer not null default 0,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+create table if not exists public.asset_links (
+  id uuid primary key default gen_random_uuid(),
+  asset_id uuid not null references public.assets (id) on delete cascade,
+  owner_id uuid not null references public.profiles (id) on delete cascade,
+  url text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+insert into public.asset_links (asset_id, owner_id, url, sort_order)
+select a.id, a.owner_id, a.link_url, 0
+from public.assets a
+where a.link_url is not null
+  and not exists (
+    select 1
+    from public.asset_links l
+    where l.asset_id = a.id
+      and l.sort_order = 0
+  );
 
 create table if not exists public.access_requests (
   id uuid primary key default gen_random_uuid(),
@@ -106,6 +130,7 @@ create index if not exists assets_group_idx on public.assets (group_id);
 create index if not exists access_requests_owner_idx on public.access_requests (owner_id, status);
 create index if not exists access_requests_asset_idx on public.access_requests (asset_id, created_at desc);
 create index if not exists asset_files_asset_idx on public.asset_files (asset_id, sort_order);
+create index if not exists asset_links_asset_idx on public.asset_links (asset_id, sort_order);
 
 create or replace function public.set_current_timestamp_updated_at()
 returns trigger

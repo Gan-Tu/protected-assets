@@ -6,6 +6,7 @@ export function RequestHistoryRow({
   requesterEmail,
   assetName,
   reason,
+  decisionNote,
   status,
   createdAt,
   processedAt,
@@ -13,6 +14,7 @@ export function RequestHistoryRow({
   requesterEmail: string;
   assetName?: string;
   reason: string;
+  decisionNote?: string | null;
   status: "approved" | "denied" | "auto_approved" | "pending";
   createdAt: string;
   processedAt?: string | null;
@@ -49,6 +51,14 @@ export function RequestHistoryRow({
           <p className="text-xs text-zinc-500 line-clamp-1 italic">
             &ldquo;{reason}&rdquo;
           </p>
+          {decisionNote ? (
+            <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600 whitespace-pre-line">
+              <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">
+                Note
+              </span>
+              {decisionNote}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-4 text-[11px] text-zinc-400 font-medium whitespace-nowrap">

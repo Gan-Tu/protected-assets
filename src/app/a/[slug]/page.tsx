@@ -37,6 +37,18 @@ export default async function ProtectedAssetPage({
     notFound();
   }
 
+  const hasLinks = asset.linkCount > 0;
+  const hasFiles = asset.fileCount > 0;
+
+  let deliveryCopy = "Approved access details are sent securely to your inbox.";
+  if (hasLinks && hasFiles) {
+    deliveryCopy = "Approved requests receive protected assets in email.";
+  } else if (hasLinks) {
+    deliveryCopy = "Approved links are sent directly to your inbox.";
+  } else if (hasFiles) {
+    deliveryCopy = "Signed document links are sent to your inbox upon approval.";
+  }
+
   return (
     <main className="min-h-screen bg-white text-zinc-950 flex flex-col items-center justify-center p-6 sm:p-12">
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px]"></div>
@@ -62,7 +74,7 @@ export default async function ProtectedAssetPage({
             <div className="space-y-4 pt-4">
               <div className="flex items-start gap-3">
                 <div className="mt-1 size-8 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-400">
-                  {asset.kind === "link" ? (
+                  {hasLinks ? (
                     <LinkIcon className="size-4" />
                   ) : (
                     <FileKeyIcon className="size-4" />
@@ -71,9 +83,10 @@ export default async function ProtectedAssetPage({
                 <div>
                   <p className="text-sm font-semibold text-zinc-900">Secure Delivery</p>
                   <p className="text-xs text-zinc-500 leading-relaxed">
-                    {asset.kind === "link"
-                      ? "Approved links are sent directly to your inbox."
-                      : "Signed document links are sent to your inbox upon approval."}
+                    {deliveryCopy}
+                  </p>
+                  <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-zinc-400">
+                    {asset.linkCount} {asset.linkCount === 1 ? "link" : "links"} and {asset.fileCount} {asset.fileCount === 1 ? "file" : "files"}
                   </p>
                 </div>
               </div>

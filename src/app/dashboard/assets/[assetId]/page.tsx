@@ -34,7 +34,7 @@ export default async function EditAssetPage({
     notFound();
   }
 
-  const [{ groups }, { asset, files, requests }] = data;
+  const [{ groups }, { asset, links, files, requests }] = data;
   const deleteFormId = `delete-asset-${asset.id}`;
   const clearHistoryFormId = `clear-request-history-${asset.id}`;
 
@@ -73,9 +73,16 @@ export default async function EditAssetPage({
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight text-zinc-950">{asset.name}</h1>
-            <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 border-zinc-200 text-zinc-500">
-              {asset.kind === "link" ? "Link" : "Bundle"}
-            </Badge>
+            {links.length ? (
+              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 border-zinc-200 text-zinc-500">
+                {links.length} {links.length === 1 ? "Link" : "Links"}
+              </Badge>
+            ) : null}
+            {files.length ? (
+              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 border-zinc-200 text-zinc-500">
+                {files.length} {files.length === 1 ? "File" : "Files"}
+              </Badge>
+            ) : null}
             <Badge className="text-[10px] font-bold uppercase tracking-wider h-5 bg-zinc-100 text-zinc-600 border-none">
               {requests.length} Requests
             </Badge>
@@ -87,7 +94,7 @@ export default async function EditAssetPage({
       </header>
 
       <div className="pt-8 border-t border-zinc-100">
-        <AssetForm action={upsertAssetAction} groups={groups} asset={asset} files={files} />
+        <AssetForm action={upsertAssetAction} groups={groups} asset={asset} links={links} files={files} />
       </div>
 
       {processedRequests.length > 0 && (
@@ -118,6 +125,7 @@ export default async function EditAssetPage({
                 key={request.id}
                 requesterEmail={request.requester_email}
                 reason={request.reason}
+                decisionNote={request.decision_note}
                 status={request.status as AccessRequestStatus}
                 createdAt={request.created_at}
                 processedAt={request.released_at || request.denied_at}

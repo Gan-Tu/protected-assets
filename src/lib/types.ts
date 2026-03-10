@@ -33,8 +33,18 @@ export interface Asset {
   link_url: string | null;
   auto_approve_enabled: boolean;
   auto_approve_delay_seconds: number;
+  auto_approve_note: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AssetLink {
+  id: string;
+  asset_id: string;
+  owner_id: string;
+  url: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface AssetFile {
@@ -65,6 +75,7 @@ export interface AccessRequest {
 }
 
 export interface DashboardAsset extends Asset {
+  links: AssetLink[];
   files: AssetFile[];
   group: AssetGroup | null;
   requestCount: number;
@@ -80,7 +91,8 @@ export interface PublicAssetView {
   name: string;
   slug: string;
   description: string | null;
-  kind: AssetKind;
   auto_approve_enabled: boolean;
   auto_approve_delay_seconds: number;
+  linkCount: number;
+  fileCount: number;
 }

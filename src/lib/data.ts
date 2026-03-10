@@ -25,6 +25,7 @@ import type {
   Asset,
   AssetFile,
   AssetGroup,
+  AssetLink,
   DashboardAsset,
   Profile,
   PublicAssetView,
@@ -114,7 +115,7 @@ export async function getDashboardData(ownerId: string) {
 
   const assetIds = (assets ?? []).map((asset) => asset.id);
 
-  const [{ data: files, error: filesError }] = await Promise.all([
+  const [{ data: files, error: filesError }, { data: links, error: linksError }] = await Promise.all([
     assetIds.length
       ? admin
           .from("asset_files")
@@ -122,15 +123,30 @@ export async function getDashboardData(ownerId: string) {
           .in("asset_id", assetIds)
           .order("sort_order")
       : Promise.resolve({ data: [], error: null }),
+    assetIds.length
+      ? admin
+          .from("asset_links")
+          .select("*")
+          .in("asset_id", assetIds)
+          .order("sort_order")
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (filesError) throw filesError;
+  if (linksError) throw linksError;
 
   const filesByAsset = new Map<string, AssetFile[]>();
   (files ?? []).forEach((file) => {
     const current = filesByAsset.get(file.asset_id) ?? [];
     current.push(file as AssetFile);
     filesByAsset.set(file.asset_id, current);
+  });
+
+  const linksByAsset = new Map<string, AssetLink[]>();
+  (links ?? []).forEach((link) => {
+    const current = linksByAsset.get(link.asset_id) ?? [];
+    current.push(link as AssetLink);
+    linksByAsset.set(link.asset_id, current);
   });
 
   const groupMap = new Map<string, AssetGroup>((groups ?? []).map((group) => [group.id, group as AssetGroup]));
@@ -145,6 +161,7 @@ export async function getDashboardData(ownerId: string) {
 
   const enrichedAssets: DashboardAsset[] = (assets ?? []).map((asset) => ({
     ...(asset as Asset),
+    links: linksByAsset.get(asset.id) ?? buildLegacyLinks(asset as Asset),
     files: filesByAsset.get(asset.id) ?? [],
     group: asset.group_id ? groupMap.get(asset.group_id) ?? null : null,
     requestCount: requestCounts.get(asset.id)?.total ?? 0,
@@ -178,9 +195,14 @@ export async function getAssetForEditor(ownerId: string, assetId: string) {
 
   if (assetError) throw assetError;
 
-  const [{ data: files, error: filesError }, { data: requests, error: requestsError }] =
+  const [
+    { data: files, error: filesError },
+    { data: links, error: linksError },
+    { data: requests, error: requestsError },
+  ] =
     await Promise.all([
       admin.from("asset_files").select("*").eq("asset_id", assetId).order("sort_order"),
+      admin.from("asset_links").select("*").eq("asset_id", assetId).order("sort_order"),
       admin
         .from("access_requests")
         .select("*")
@@ -189,10 +211,12 @@ export async function getAssetForEditor(ownerId: string, assetId: string) {
     ]);
 
   if (filesError) throw filesError;
+  if (linksError) throw linksError;
   if (requestsError) throw requestsError;
 
   return {
     asset: asset as Asset,
+    links: (links?.length ? links : buildLegacyLinks(asset as Asset)) as AssetLink[],
     files: (files ?? []) as AssetFile[],
     requests: requests ?? [],
   };
@@ -202,12 +226,41 @@ export async function getPublicAssetBySlug(slug: string) {
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from("assets")
-    .select("id,name,slug,description,kind,auto_approve_enabled,auto_approve_delay_seconds")
+    .select("id,owner_id,name,slug,description,link_url,auto_approve_enabled,auto_approve_delay_seconds")
     .eq("slug", slug)
     .single();
 
   if (error) return null;
-  return data as PublicAssetView;
+
+  const asset = data as Pick<
+    Asset,
+    "id" | "owner_id" | "name" | "slug" | "description" | "link_url" | "auto_approve_enabled" | "auto_approve_delay_seconds"
+  >;
+
+  const [{ data: links }, { count: fileCount }] = await Promise.all([
+    admin
+      .from("asset_links")
+      .select("*")
+      .eq("asset_id", asset.id)
+      .order("sort_order"),
+    admin
+      .from("asset_files")
+      .select("*", { count: "exact", head: true })
+      .eq("asset_id", asset.id),
+  ]);
+
+  const resolvedLinks = (links?.length ? links : buildLegacyLinks(asset as Asset)) as AssetLink[];
+
+  return {
+    id: asset.id,
+    name: asset.name,
+    slug: asset.slug,
+    description: asset.description,
+    auto_approve_enabled: asset.auto_approve_enabled,
+    auto_approve_delay_seconds: asset.auto_approve_delay_seconds,
+    linkCount: resolvedLinks.length,
+    fileCount: fileCount ?? 0,
+  } satisfies PublicAssetView;
 }
 
 function parseAutoApprove(formData: FormData) {
@@ -282,19 +335,40 @@ async function uploadFiles(ownerId: string, assetId: string, files: File[]) {
   return uploaded;
 }
 
+function buildLegacyLinks(
+  asset: Pick<Asset, "id" | "owner_id" | "link_url">,
+): AssetLink[] {
+  if (!asset.link_url) {
+    return [];
+  }
+
+  return [
+    {
+      id: `legacy-${asset.id}`,
+      asset_id: asset.id,
+      owner_id: asset.owner_id,
+      url: asset.link_url,
+      sort_order: 0,
+      created_at: "",
+    },
+  ];
+}
+
 export async function saveAsset(ownerId: string, formData: FormData, assetId?: string) {
   const admin = createAdminSupabaseClient();
   const name = String(formData.get("name") ?? "").trim();
-  const kind = String(formData.get("kind") ?? "link") as Asset["kind"];
   const description = String(formData.get("description") ?? "").trim();
   const groupId = String(formData.get("group_id") ?? "").trim() || null;
-  const linkUrl = String(formData.get("link_url") ?? "").trim() || null;
+  const linkUrls = formData
+    .getAll("link_url")
+    .map((entry) => String(entry).trim())
+    .filter(Boolean);
   const slugInput = String(formData.get("slug") ?? "").trim();
   const replaceFiles = coerceBoolean(formData.get("replace_files"));
   const autoApprove = parseAutoApprove(formData);
+  const autoApproveNote = String(formData.get("release_note") ?? "").trim();
 
   if (!name) throw new Error("Asset name is required.");
-  if (kind === "link" && !linkUrl) throw new Error("A link URL is required for link assets.");
 
   const files = formData
     .getAll("files")
@@ -303,18 +377,8 @@ export async function saveAsset(ownerId: string, formData: FormData, assetId?: s
   const slug = await ensureUniqueSlug(slugInput || name, ownerId, assetId);
 
   let existingFiles: AssetFile[] = [];
-  let previousKind: Asset["kind"] | null = null;
 
   if (assetId) {
-    const { data: existingAsset } = await admin
-      .from("assets")
-      .select("kind")
-      .eq("id", assetId)
-      .eq("owner_id", ownerId)
-      .single();
-
-    previousKind = existingAsset?.kind as Asset["kind"];
-
     const { data: currentFiles } = await admin
       .from("asset_files")
       .select("*")
@@ -327,20 +391,17 @@ export async function saveAsset(ownerId: string, formData: FormData, assetId?: s
     assetId = randomUUID();
   }
 
-  if (previousKind === "files" && kind === "link") {
+  if (replaceFiles && existingFiles.length) {
     await deleteStoredFiles(existingFiles.map((file) => file.storage_path));
     await admin.from("asset_files").delete().eq("asset_id", assetId);
     existingFiles = [];
   }
 
-  if (kind === "files" && replaceFiles && existingFiles.length) {
-    await deleteStoredFiles(existingFiles.map((file) => file.storage_path));
-    await admin.from("asset_files").delete().eq("asset_id", assetId);
-    existingFiles = [];
-  }
+  const resultingFileCount = existingFiles.length + files.length;
+  const resultingLinkCount = linkUrls.length;
 
-  if (kind === "files" && !existingFiles.length && !files.length) {
-    throw new Error("Upload at least one document for a file asset.");
+  if (!resultingFileCount && !resultingLinkCount) {
+    throw new Error("Add at least one protected link or upload at least one file.");
   }
 
   const payload = {
@@ -350,16 +411,37 @@ export async function saveAsset(ownerId: string, formData: FormData, assetId?: s
     name,
     slug,
     description: description || null,
-    kind,
-    link_url: kind === "link" ? linkUrl : null,
+    kind: resultingFileCount > 0 ? ("files" satisfies Asset["kind"]) : ("link" satisfies Asset["kind"]),
+    link_url: linkUrls[0] ?? null,
     auto_approve_enabled: autoApprove.enabled,
     auto_approve_delay_seconds: autoApprove.totalSeconds,
+    auto_approve_note: autoApprove.enabled ? autoApproveNote || null : null,
   };
 
   const { error: assetError } = await admin.from("assets").upsert(payload);
   if (assetError) throw assetError;
 
-  if (kind === "files" && files.length) {
+  const { error: deleteLinksError } = await admin
+    .from("asset_links")
+    .delete()
+    .eq("asset_id", assetId);
+
+  if (deleteLinksError) throw deleteLinksError;
+
+  if (linkUrls.length) {
+    const { error: linksError } = await admin.from("asset_links").insert(
+      linkUrls.map((url, index) => ({
+        asset_id: assetId,
+        owner_id: ownerId,
+        url,
+        sort_order: index,
+      })),
+    );
+
+    if (linksError) throw linksError;
+  }
+
+  if (files.length) {
     const uploaded = await uploadFiles(ownerId, assetId, files);
     const startingOrder =
       existingFiles.length > 0
@@ -549,7 +631,55 @@ export async function submitAccessRequest(formData: FormData) {
   };
 }
 
-async function buildReleaseLinks(assetId: string) {
+function shouldAttachFile(file: AssetFile) {
+  const allowedContentTypes = new Set([
+    "application/pdf",
+    "text/plain",
+    "text/csv",
+    "text/markdown",
+    "application/json",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ]);
+  const allowedExtensions = new Set([
+    "pdf",
+    "txt",
+    "csv",
+    "md",
+    "json",
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "webp",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+  ]);
+
+  const extension = file.file_name.includes(".")
+    ? file.file_name.split(".").pop()?.toLowerCase()
+    : null;
+
+  if (file.content_type && allowedContentTypes.has(file.content_type)) {
+    return true;
+  }
+
+  return extension ? allowedExtensions.has(extension) : false;
+}
+
+async function buildReleaseFileDelivery(assetId: string) {
   const admin = createAdminSupabaseClient();
   const { data: files, error } = await admin
     .from("asset_files")
@@ -559,28 +689,88 @@ async function buildReleaseLinks(assetId: string) {
 
   if (error) throw error;
 
-  const resolvedLinks = [];
+  const maxAttachmentBytes = 28 * 1024 * 1024;
+  let attachedBytes = 0;
+  const attachments: {
+    filename: string;
+    content: Buffer;
+    content_type?: string;
+  }[] = [];
+  const fileLinks: { name: string; url: string }[] = [];
 
-  for (const file of files ?? []) {
-    const { data, error: signedUrlError } = await admin.storage
+  for (const file of (files ?? []) as AssetFile[]) {
+    const signedName = `${file.file_name} (${compactFileSize(file.file_size)})`;
+    const canAttachByType = shouldAttachFile(file);
+    const fileSize = file.file_size ?? 0;
+    const fitsAttachmentBudget =
+      fileSize > 0 && attachedBytes + fileSize <= maxAttachmentBytes;
+
+    if (canAttachByType && fitsAttachmentBudget) {
+      const { data: downloadData, error: downloadError } = await admin.storage
+        .from(ASSET_BUCKET)
+        .download(file.storage_path);
+
+      if (!downloadError && downloadData) {
+        const buffer = Buffer.from(await downloadData.arrayBuffer());
+        attachments.push({
+          filename: file.file_name,
+          content: buffer,
+          content_type: file.content_type || undefined,
+        });
+        attachedBytes += buffer.byteLength;
+        continue;
+      }
+    }
+
+    const { data: signedData, error: signedUrlError } = await admin.storage
       .from(ASSET_BUCKET)
       .createSignedUrl(file.storage_path, REQUEST_LINK_TTL_SECONDS);
 
     if (signedUrlError) throw signedUrlError;
 
-    resolvedLinks.push({
-      name: `${file.file_name} (${compactFileSize(file.file_size)})`,
-      url: data.signedUrl,
+    fileLinks.push({
+      name: signedName,
+      url: signedData.signedUrl,
     });
   }
 
+  return { attachments, fileLinks };
+}
+
+async function buildReleaseUrlLinks(asset: Asset) {
+  const admin = createAdminSupabaseClient();
+  const { data: links, error } = await admin
+    .from("asset_links")
+    .select("*")
+    .eq("asset_id", asset.id)
+    .order("sort_order");
+
+  if (error) throw error;
+
+  const resolvedLinks = (links?.length ? links : buildLegacyLinks(asset)).map((link, index) => ({
+    name: `Protected link ${index + 1}`,
+    url: link.url,
+  }));
+
   return resolvedLinks;
+}
+
+function buildStoredReleaseNote(
+  releaseNote: string | null,
+  approvalNote: string | null,
+) {
+  if (releaseNote && approvalNote) {
+    return `Release note:\n${releaseNote}\n\nApproval note:\n${approvalNote}`;
+  }
+
+  return approvalNote ?? releaseNote;
 }
 
 export async function releaseRequest(
   requestId: string,
   releaseMode: "approved" | "auto_approved",
   ownerId?: string,
+  decisionNote?: string | null,
 ) {
   const admin = createAdminSupabaseClient();
   let query = admin
@@ -592,9 +782,17 @@ export async function releaseRequest(
     query = query.eq("owner_id", ownerId);
   }
 
-  const { data: request, error } = await query.single();
+  const { data: request, error } = await query.maybeSingle();
 
-  if (error || !request) {
+  if (error) {
+    throw new Error("Request not found.");
+  }
+
+  if (!request) {
+    if (releaseMode === "auto_approved") {
+      return { skipped: true };
+    }
+
     throw new Error("Request not found.");
   }
 
@@ -602,26 +800,47 @@ export async function releaseRequest(
     return { skipped: true };
   }
 
-  const asset = request.assets as Asset;
+  const asset = request.assets as Asset | null;
 
-  const { error: updateError } = await admin
+  if (!asset) {
+    if (releaseMode === "auto_approved") {
+      return { skipped: true };
+    }
+
+    throw new Error("Asset not found.");
+  }
+
+  const releaseNote = asset.auto_approve_note?.trim() || null;
+  const approvalNote =
+    releaseMode === "approved" ? decisionNote?.trim() || null : null;
+  const storedDecisionNote = buildStoredReleaseNote(releaseNote, approvalNote);
+
+  const { data: updatedRequest, error: updateError } = await admin
     .from("access_requests")
     .update({
       status: releaseMode,
       approved_at: new Date().toISOString(),
       released_at: new Date().toISOString(),
+      decision_note: storedDecisionNote,
       qstash_message_id: null,
     })
     .eq("id", requestId)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) throw updateError;
+
+  if (!updatedRequest) {
+    return { skipped: true };
+  }
 
   if (releaseMode === "approved") {
     await cancelAutoRelease(request.qstash_message_id);
   }
 
   const shareUrl = `${getBaseUrl()}/a/${asset.slug}`;
+  const fileDelivery = await buildReleaseFileDelivery(asset.id);
 
   await sendRequesterReleaseEmail({
     requestId,
@@ -629,9 +848,12 @@ export async function releaseRequest(
     assetName: asset.name,
     assetDescription: asset.description,
     releaseMode,
-    linkUrl: asset.kind === "link" ? asset.link_url : null,
-    fileLinks: asset.kind === "files" ? await buildReleaseLinks(asset.id) : [],
+    links: await buildReleaseUrlLinks(asset),
+    attachments: fileDelivery.attachments,
+    fileLinks: fileDelivery.fileLinks,
     shareUrl,
+    releaseNote,
+    decisionNote: approvalNote,
   });
 
   revalidatePath("/dashboard");
@@ -641,7 +863,11 @@ export async function releaseRequest(
   return { skipped: false };
 }
 
-export async function denyRequest(ownerId: string, requestId: string) {
+export async function denyRequest(
+  ownerId: string,
+  requestId: string,
+  decisionNote?: string | null,
+) {
   const admin = createAdminSupabaseClient();
   const { data: request, error } = await admin
     .from("access_requests")
@@ -656,15 +882,19 @@ export async function denyRequest(ownerId: string, requestId: string) {
 
   if (request.status !== "pending") return;
 
-  await admin
+  const normalizedDecisionNote = decisionNote?.trim() || null;
+  const { error: updateError } = await admin
     .from("access_requests")
     .update({
       status: "denied" satisfies AccessRequestStatus,
       denied_at: new Date().toISOString(),
+      decision_note: normalizedDecisionNote,
       qstash_message_id: null,
     })
     .eq("id", requestId)
     .eq("status", "pending");
+
+  if (updateError) throw updateError;
 
   await cancelAutoRelease(request.qstash_message_id);
 
@@ -672,6 +902,7 @@ export async function denyRequest(ownerId: string, requestId: string) {
     requestId,
     requesterEmail: request.requester_email,
     assetName: request.assets.name,
+    decisionNote: normalizedDecisionNote,
   });
 
   revalidatePath("/dashboard");

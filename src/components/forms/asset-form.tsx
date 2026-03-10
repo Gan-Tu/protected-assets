@@ -1,19 +1,16 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { GlobeIcon, UploadIcon, ClockIcon, ShieldCheckIcon, InfoIcon } from "lucide-react";
+import { ClockIcon, GlobeIcon, InfoIcon, PlusIcon, ShieldCheckIcon, Trash2Icon, UploadIcon } from "lucide-react";
 
 import type { AssetFormState } from "@/app/dashboard/actions";
 import { SubmitButton } from "@/components/app/submit-button";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DEFAULT_AUTO_APPROVE_DELAY_SECONDS } from "@/lib/constants";
-import type { Asset, AssetFile, AssetGroup } from "@/lib/types";
+import type { Asset, AssetFile, AssetGroup, AssetLink } from "@/lib/types";
 import { compactFileSize } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -28,22 +25,36 @@ function splitDelay(totalSeconds: number) {
   return { days, hours, minutes, seconds };
 }
 
+function getInitialLinkInputs(asset?: Asset, links: AssetLink[] = []) {
+  if (links.length) {
+    return links.map((link) => link.url);
+  }
+
+  if (asset?.link_url) {
+    return [asset.link_url];
+  }
+
+  return [""];
+}
+
 export function AssetForm({
   action,
   groups,
   asset,
+  links = [],
   files = [],
 }: {
   action: (state: AssetFormState, formData: FormData) => Promise<AssetFormState>;
   groups: AssetGroup[];
   asset?: Asset;
+  links?: AssetLink[];
   files?: AssetFile[];
 }) {
   const [state, formAction] = useActionState(action, initialState);
-  const [kind, setKind] = useState<"link" | "files">(asset?.kind ?? "link");
   const [autoApproveEnabled, setAutoApproveEnabled] = useState(
     asset?.auto_approve_enabled ?? true,
   );
+  const [linkInputs, setLinkInputs] = useState<string[]>(getInitialLinkInputs(asset, links));
   const delayValues = useMemo(
     () =>
       splitDelay(
@@ -51,6 +62,26 @@ export function AssetForm({
       ),
     [asset?.auto_approve_delay_seconds],
   );
+
+  function updateLink(index: number, value: string) {
+    setLinkInputs((current) =>
+      current.map((link, currentIndex) => (currentIndex === index ? value : link)),
+    );
+  }
+
+  function addLink() {
+    setLinkInputs((current) => [...current, ""]);
+  }
+
+  function removeLink(index: number) {
+    setLinkInputs((current) => {
+      if (current.length === 1) {
+        return [""];
+      }
+
+      return current.filter((_, currentIndex) => currentIndex !== index);
+    });
+  }
 
   return (
     <form action={formAction} className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -109,95 +140,90 @@ export function AssetForm({
           </div>
         </section>
 
-        <section className="space-y-4">
-          <Label className="text-zinc-700">Asset Content</Label>
-          <div className="flex p-1 bg-zinc-100 rounded-lg w-fit">
-            <button
-              type="button"
-              className={cn(
-                "flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-md transition-all",
-                kind === "link" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
-              )}
-              onClick={() => setKind("link")}
-            >
-              <GlobeIcon className="size-3.5" />
-              Link
-            </button>
-            <button
-              type="button"
-              className={cn(
-                "flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-md transition-all",
-                kind === "files" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
-              )}
-              onClick={() => setKind("files")}
-            >
-              <UploadIcon className="size-3.5" />
-              Files
-            </button>
-          </div>
-          <input type="hidden" name="kind" value={kind} />
+        <section className="space-y-6">
+          <div className="space-y-2">
+            <Label className="text-zinc-700">Protected Links</Label>
+            <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/50 p-6">
+              <div className="space-y-1">
+                <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+                  <GlobeIcon className="size-3.5 text-zinc-500" />
+                  Link Access
+                </p>
+                <p className="text-xs text-zinc-500">
+                  Add as many destination URLs as you want. These are delivered alongside any uploaded files.
+                </p>
+              </div>
 
-          <AnimatePresence mode="wait">
-            {kind === "link" ? (
-              <motion.div
-                key="link"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.2 }}
-                className="grid gap-2"
-              >
-                <Label htmlFor="link_url" className="text-zinc-600 text-xs">Destination URL</Label>
-                <Input
-                  id="link_url"
-                  name="link_url"
-                  defaultValue={asset?.link_url ?? ""}
-                  placeholder="https://..."
-                  type="url"
-                  className="bg-white"
-                  required={kind === "link"}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="files"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4 p-6 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50"
-              >
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-zinc-900">Document Bundle</p>
-                  <p className="text-xs text-zinc-500">Upload one or more files to be shared.</p>
-                </div>
-                
-                <div className="grid gap-2">
-                  <Input id="files" name="files" type="file" multiple className="bg-white cursor-pointer" />
-                </div>
-
-                {files.length ? (
-                  <div className="space-y-3 pt-4 border-t border-zinc-200">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Current Files</p>
-                      <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
-                        <input type="checkbox" name="replace_files" className="rounded border-zinc-300" />
-                        Replace all
-                      </label>
-                    </div>
-                    <div className="grid gap-1.5">
-                      {files.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-2.5 rounded-md bg-white border border-zinc-100 text-sm">
-                          <span className="text-zinc-700 truncate">{file.file_name}</span>
-                          <span className="text-zinc-400 text-xs shrink-0">{compactFileSize(file.file_size)}</span>
-                        </div>
-                      ))}
-                    </div>
+              <div className="space-y-3">
+                {linkInputs.map((link, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <Input
+                      name="link_url"
+                      value={link}
+                      onChange={(event) => updateLink(index, event.target.value)}
+                      placeholder="https://..."
+                      type="url"
+                      className="bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeLink(index)}
+                      className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900"
+                      aria-label={`Remove link ${index + 1}`}
+                    >
+                      <Trash2Icon className="size-4" />
+                    </button>
                   </div>
-                ) : null}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addLink}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
+              >
+                <PlusIcon className="size-4" />
+                Add another link
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-zinc-700">Protected Files</Label>
+            <div className="space-y-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 p-6">
+              <div className="space-y-1">
+                <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+                  <UploadIcon className="size-3.5 text-zinc-500" />
+                  Document Bundle
+                </p>
+                <p className="text-xs text-zinc-500">Upload one or more files to deliver with the protected links.</p>
+              </div>
+
+              <div className="grid gap-2">
+                <Input id="files" name="files" type="file" multiple className="bg-white cursor-pointer" />
+              </div>
+
+              {files.length ? (
+                <div className="space-y-3 pt-4 border-t border-zinc-200">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Current Files</p>
+                    <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
+                      <input type="checkbox" name="replace_files" className="rounded border-zinc-300" />
+                      Replace all
+                    </label>
+                  </div>
+                  <div className="grid gap-1.5">
+                    {files.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between rounded-md border border-zinc-100 bg-white p-2.5 text-sm">
+                        <span className="truncate text-zinc-700">{file.file_name}</span>
+                        <span className="shrink-0 text-xs text-zinc-400">{compactFileSize(file.file_size)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </section>
 
         {state.error && (
@@ -255,6 +281,23 @@ export function AssetForm({
                 <Label htmlFor="auto_approve_seconds" className="text-[10px] uppercase font-bold text-zinc-400">Sec</Label>
                 <Input id="auto_approve_seconds" name="auto_approve_seconds" type="number" min="0" max="59" defaultValue={delayValues.seconds} className="h-8 text-sm" />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="release_note" className="text-[10px] uppercase font-bold text-zinc-400">
+                Release Note
+              </Label>
+              <Textarea
+                id="release_note"
+                name="release_note"
+                defaultValue={asset?.auto_approve_note ?? ""}
+                placeholder="Optional note to include on every approval and auto-release."
+                rows={4}
+                className="resize-none bg-white text-sm"
+              />
+              <p className="text-xs leading-relaxed text-zinc-500">
+                This note is always attached when access is granted. Manual approvals can still add a separate one-off note.
+              </p>
             </div>
           </CardContent>
         </Card>

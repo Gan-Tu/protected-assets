@@ -7,12 +7,10 @@ import {
   deleteCollectionAction,
 } from "@/app/dashboard/actions";
 import { ConfirmSubmitButton } from "@/components/app/confirm-submit-button";
-import { CopyLinkButton } from "@/components/app/copy-link-button";
+import { AssetsListSection } from "@/components/dashboard/assets-list-section";
 import { RequestDecisionRow } from "@/components/dashboard/request-decision-row";
 import { RequestHistoryRow } from "@/components/dashboard/request-history-row";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
 import { getDashboardData, requireOwner } from "@/lib/data";
 import type { AccessRequestStatus } from "@/lib/types";
 import { formatRelativeWindow, getBaseUrl, cn } from "@/lib/utils";
@@ -87,61 +85,11 @@ export default async function DashboardPage({
 
       <div className="grid gap-12 lg:grid-cols-[1fr_320px]">
         <div className="space-y-12">
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
-                {activeGroup ? `Assets in ${activeGroup.name}` : "Recent Assets"}
-              </h2>
-              <Link href="/dashboard" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
-                View all
-              </Link>
-            </div>
-            <div className="grid gap-4">
-              {filteredAssets.length ? (
-                filteredAssets.map((asset) => {
-                  const shareUrl = `${getBaseUrl()}/a/${asset.slug}`;
-                  return (
-                    <Card key={asset.id} className="border-zinc-200/60 shadow-sm hover:border-zinc-300 transition-colors">
-                      <CardContent className="p-5">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-zinc-900">{asset.name}</h3>
-                              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider py-0 h-4 rounded-sm border-zinc-200 text-zinc-500">
-                                {asset.kind}
-                              </Badge>
-                              {asset.auto_approve_enabled && (
-                                <Badge className="text-[10px] font-bold uppercase tracking-wider py-0 h-4 rounded-sm bg-zinc-100 text-zinc-600 border-none">
-                                  Auto
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-zinc-500 line-clamp-1">{asset.description || "No description"}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CopyLinkButton value={shareUrl} />
-                            <Link 
-                              href={`/dashboard/assets/${asset.id}`} 
-                              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer")}
-                            >
-                              Edit
-                            </Link>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              ) : (
-                <div className="rounded-lg border border-dashed border-zinc-200 p-12 text-center">
-                  <p className="text-sm text-zinc-500">No assets created yet.</p>
-                  <Link href="/dashboard/assets/new" className="mt-4 inline-flex text-sm font-medium text-zinc-900 underline underline-offset-4">
-                    Create your first asset
-                  </Link>
-                </div>
-              )}
-            </div>
-          </section>
+          <AssetsListSection
+            assets={filteredAssets}
+            baseUrl={getBaseUrl()}
+            activeGroupName={activeGroup?.name ?? null}
+          />
 
           <section className="space-y-4">
             <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Pending Approvals</h2>
@@ -198,6 +146,7 @@ export default async function DashboardPage({
                       requesterEmail={request.requester_email}
                       assetName={request.asset?.name}
                       reason={request.reason}
+                      decisionNote={request.decision_note}
                       status={request.status as AccessRequestStatus}
                       createdAt={request.created_at}
                       processedAt={request.released_at || request.denied_at}
