@@ -5,7 +5,7 @@ import { UserIcon, BellIcon, PhoneIcon } from "lucide-react";
 
 import type { SettingsFormState } from "@/app/dashboard/actions";
 import { SubmitButton } from "@/components/app/submit-button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Profile } from "@/lib/types";

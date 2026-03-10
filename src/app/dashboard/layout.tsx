@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutGridIcon, LogOutIcon, PlusIcon, Settings2Icon } from "lucide-react";
+import { LayoutGridIcon, LogOutIcon, Settings2Icon } from "lucide-react";
 
 import { signOutAction } from "@/app/auth/actions";
 import { LogoMark } from "@/components/app/logo-mark";

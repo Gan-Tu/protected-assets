@@ -29,6 +29,22 @@ export function compactFileSize(bytes: number | null | undefined) {
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+export function formatHumanDateTime(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function formatRelativeWindow(
   totalSeconds: number,
   options?: { verbose?: boolean },

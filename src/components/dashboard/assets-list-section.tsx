@@ -10,7 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { DashboardAsset } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatHumanDateTime } from "@/lib/utils";
 
 export function AssetsListSection({
   assets,
@@ -56,7 +56,7 @@ export function AssetsListSection({
           </p>
         </div>
         {activeGroupName ? (
-          <Link href="/dashboard" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
+          <Link href="/dashboard" className="cursor-pointer text-sm font-medium text-zinc-600 hover:text-zinc-900">
             View all
           </Link>
         ) : null}
@@ -100,6 +100,9 @@ export function AssetsListSection({
                         ) : null}
                       </div>
                       <p className="text-sm leading-relaxed text-zinc-500">{asset.description || "No description"}</p>
+                      <p className="text-xs font-medium text-zinc-400">
+                        Last updated {formatHumanDateTime(asset.updated_at)}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <CopyLinkButton value={shareUrl} />
@@ -136,7 +139,10 @@ export function AssetsListSection({
                 Clear search
               </button>
             ) : (
-              <Link href="/dashboard/assets/new" className="mt-4 inline-flex text-sm font-medium text-zinc-900 underline underline-offset-4">
+              <Link
+                href="/dashboard/assets/new"
+                className="mt-4 inline-flex cursor-pointer text-sm font-medium text-zinc-900 underline underline-offset-4"
+              >
                 Create your first asset
               </Link>
             )}

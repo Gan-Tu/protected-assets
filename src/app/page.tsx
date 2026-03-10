@@ -48,7 +48,10 @@ export default async function Home() {
         </header>
 
         <section className="mt-24 mb-20 text-center">
-          <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500 bg-zinc-50/50">
+          <Badge
+            variant="outline"
+            className="rounded-full border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-emerald-700"
+          >
             Introducing Auto-Release
           </Badge>
           <h1 className="mt-8 text-5xl font-bold tracking-tight text-zinc-950 sm:text-7xl">
