@@ -69,7 +69,7 @@ export default async function ProtectedAssetPage({
 
             <div className="space-y-4 pt-4">
               <div className="flex items-start gap-3">
-                <div className="mt-1 size-8 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-400">
+                <div className="mt-1 size-8 shrink-0 flex items-center justify-center rounded-lg border border-zinc-100 bg-zinc-50 text-zinc-400">
                   {hasLinks ? (
                     <LinkIcon className="size-4" />
                   ) : (
@@ -88,7 +88,7 @@ export default async function ProtectedAssetPage({
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="mt-1 size-8 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-400">
+                <div className="mt-1 size-8 shrink-0 flex items-center justify-center rounded-lg border border-zinc-100 bg-zinc-50 text-zinc-400">
                   <ShieldCheckIcon className="size-4" />
                 </div>
                 <div>
@@ -101,7 +101,7 @@ export default async function ProtectedAssetPage({
 
               {asset.auto_approve_enabled && (
                 <div className="flex items-start gap-3">
-                  <div className="mt-1 size-8 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-400">
+                  <div className="mt-1 size-8 shrink-0 flex items-center justify-center rounded-lg border border-zinc-100 bg-zinc-50 text-zinc-400">
                     <ClockIcon className="size-4" />
                   </div>
                   <div>

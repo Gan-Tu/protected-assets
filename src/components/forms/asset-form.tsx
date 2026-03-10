@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useState, type ChangeEvent } from "react";
 import { ClockIcon, GlobeIcon, InfoIcon, PlusIcon, ShieldCheckIcon, Trash2Icon, UploadIcon } from "lucide-react";
 
 import type { AssetFormState } from "@/app/dashboard/actions";
@@ -15,6 +15,7 @@ import { compactFileSize } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const initialState: AssetFormState = {};
+const SERVER_ACTION_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
 
 function splitDelay(totalSeconds: number) {
   const days = Math.floor(totalSeconds / 86400);
@@ -37,6 +38,10 @@ function getInitialLinkInputs(asset?: Asset, links: AssetLink[] = []) {
   return [""];
 }
 
+function getPendingFileSignature(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
 export function AssetForm({
   action,
   groups,
@@ -55,6 +60,7 @@ export function AssetForm({
     asset?.auto_approve_enabled ?? true,
   );
   const [linkInputs, setLinkInputs] = useState<string[]>(getInitialLinkInputs(asset, links));
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const delayValues = useMemo(
     () =>
       splitDelay(
@@ -62,6 +68,12 @@ export function AssetForm({
       ),
     [asset?.auto_approve_delay_seconds],
   );
+  const pendingUploadBytes = useMemo(
+    () => pendingFiles.reduce((total, file) => total + file.size, 0),
+    [pendingFiles],
+  );
+  const pendingUploadLimitExceeded =
+    pendingUploadBytes > SERVER_ACTION_UPLOAD_LIMIT_BYTES;
 
   function updateLink(index: number, value: string) {
     setLinkInputs((current) =>
@@ -83,8 +95,54 @@ export function AssetForm({
     });
   }
 
+  function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+
+    if (!selectedFiles.length) {
+      return;
+    }
+
+    setPendingFiles((current) => {
+      const seen = new Set(current.map((file) => getPendingFileSignature(file)));
+      const nextFiles = [...current];
+
+      for (const file of selectedFiles) {
+        const signature = getPendingFileSignature(file);
+
+        if (seen.has(signature)) {
+          continue;
+        }
+
+        seen.add(signature);
+        nextFiles.push(file);
+      }
+
+      return nextFiles;
+    });
+
+    event.target.value = "";
+  }
+
+  function removePendingFile(signature: string) {
+    setPendingFiles((current) =>
+      current.filter((file) => getPendingFileSignature(file) !== signature),
+    );
+  }
+
+  async function submitAssetForm(formData: FormData) {
+    if (pendingUploadLimitExceeded) {
+      return;
+    }
+
+    for (const file of pendingFiles) {
+      formData.append("files", file);
+    }
+
+    await formAction(formData);
+  }
+
   return (
-    <form action={formAction} className="grid gap-8 lg:grid-cols-[1fr_320px]">
+    <form action={submitAssetForm} className="grid gap-8 lg:grid-cols-[1fr_320px]">
       {asset ? <input type="hidden" name="asset_id" value={asset.id} /> : null}
       
       <div className="space-y-8">
@@ -196,12 +254,79 @@ export function AssetForm({
                   <UploadIcon className="size-3.5 text-zinc-500" />
                   Document Bundle
                 </p>
-                <p className="text-xs text-zinc-500">Upload one or more files to deliver with the protected links.</p>
+                <p className="text-xs text-zinc-500">
+                  Select files in batches. Each selection is queued below until you save the asset.
+                </p>
+                <p className="text-[11px] text-zinc-400">
+                  Total file upload limit per save: {compactFileSize(SERVER_ACTION_UPLOAD_LIMIT_BYTES)}.
+                </p>
               </div>
 
               <div className="grid gap-2">
-                <Input id="files" name="files" type="file" multiple className="bg-white cursor-pointer" />
+                <Input
+                  id="files"
+                  type="file"
+                  multiple
+                  onChange={handleFileSelection}
+                  className="bg-white cursor-pointer"
+                />
+                <p className="text-[11px] text-zinc-400">
+                  You can keep clicking upload to add more files before the final save.
+                </p>
               </div>
+
+              {pendingFiles.length ? (
+                <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                      Pending Uploads
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      {pendingFiles.length} {pendingFiles.length === 1 ? "file" : "files"} queued
+                    </p>
+                  </div>
+                  <p
+                    className={cn(
+                      "text-xs",
+                      pendingUploadLimitExceeded ? "text-red-600" : "text-zinc-500",
+                    )}
+                  >
+                    Files queued for this save: {compactFileSize(pendingUploadBytes)} of{" "}
+                    {compactFileSize(SERVER_ACTION_UPLOAD_LIMIT_BYTES)}
+                  </p>
+                  <div className="grid gap-1.5">
+                    {pendingFiles.map((file) => {
+                      const signature = getPendingFileSignature(file);
+
+                      return (
+                        <div
+                          key={signature}
+                          className="flex items-center justify-between gap-3 rounded-md border border-zinc-100 bg-zinc-50 p-2.5 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-zinc-700">{file.name}</p>
+                            <p className="text-xs text-zinc-400">{compactFileSize(file.size)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removePendingFile(signature)}
+                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900"
+                            aria-label={`Remove pending file ${file.name}`}
+                          >
+                            <Trash2Icon className="size-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {pendingUploadLimitExceeded ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium leading-relaxed text-red-700">
+                  This save exceeds the {compactFileSize(SERVER_ACTION_UPLOAD_LIMIT_BYTES)} upload limit. Remove some files before saving.
+                </div>
+              ) : null}
 
               {files.length ? (
                 <div className="space-y-3 pt-4 border-t border-zinc-200">
@@ -233,7 +358,11 @@ export function AssetForm({
         )}
 
         <div className="pt-6 border-t border-zinc-100">
-          <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving...">
+          <SubmitButton
+            className="w-full sm:w-auto"
+            pendingLabel="Saving..."
+            disabled={pendingUploadLimitExceeded}
+          >
             {asset ? "Save Changes" : "Create Asset"}
           </SubmitButton>
         </div>

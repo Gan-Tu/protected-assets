@@ -28,12 +28,14 @@ export function SubmitButton({
   className,
   variant,
   size,
+  disabled = false,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
   className?: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
 
@@ -43,7 +45,7 @@ export function SubmitButton({
       className={cn("cursor-pointer", className)}
       variant={variant}
       size={size}
-      disabled={pending}
+      disabled={pending || disabled}
     >
       {pending ? pendingLabel : children}
     </Button>
