@@ -541,13 +541,14 @@ export async function updateProfile(
 export async function submitAccessRequest(formData: FormData) {
   const admin = createAdminSupabaseClient();
   const slug = String(formData.get("slug") ?? "").trim();
+  const requesterName = String(formData.get("requester_name") ?? "").trim();
   const requesterEmail = String(formData.get("requester_email") ?? "")
     .trim()
     .toLowerCase();
   const reason = String(formData.get("reason") ?? "").trim();
 
-  if (!slug || !requesterEmail || !reason) {
-    throw new Error("Email and reason are required.");
+  if (!slug || !requesterName || !requesterEmail || !reason) {
+    throw new Error("Name, email, and reason are required.");
   }
 
   const { data: asset, error: assetError } = await admin
@@ -567,6 +568,7 @@ export async function submitAccessRequest(formData: FormData) {
     .insert({
       asset_id: asset.id,
       owner_id: asset.owner_id,
+      requester_name: requesterName,
       requester_email: requesterEmail,
       reason,
       status: "pending",
@@ -613,6 +615,7 @@ export async function submitAccessRequest(formData: FormData) {
     sendSmsNotification: profile.notification_sms,
     assetName: asset.name,
     assetSlug: asset.slug,
+    requesterName,
     requesterEmail,
     reason,
     autoApproveDelaySeconds: asset.auto_approve_enabled

@@ -110,6 +110,7 @@ create table if not exists public.access_requests (
   id uuid primary key default gen_random_uuid(),
   asset_id uuid not null references public.assets (id) on delete cascade,
   owner_id uuid not null references public.profiles (id) on delete cascade,
+  requester_name text,
   requester_email text not null,
   reason text not null,
   status public.request_status not null default 'pending',
@@ -123,6 +124,9 @@ create table if not exists public.access_requests (
 
 alter table public.access_requests
 add column if not exists qstash_message_id text;
+
+alter table public.access_requests
+add column if not exists requester_name text;
 
 create index if not exists asset_groups_owner_idx on public.asset_groups (owner_id);
 create index if not exists assets_owner_idx on public.assets (owner_id);

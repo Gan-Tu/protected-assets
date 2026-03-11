@@ -150,6 +150,7 @@ export default async function EditAssetPage({
             {processedRequests.map((request) => (
               <RequestHistoryRow
                 key={request.id}
+                requesterName={request.requester_name}
                 requesterEmail={request.requester_email}
                 reason={request.reason}
                 decisionNote={request.decision_note}

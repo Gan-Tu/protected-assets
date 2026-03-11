@@ -63,6 +63,7 @@ export interface AccessRequest {
   id: string;
   asset_id: string;
   owner_id: string;
+  requester_name: string | null;
   requester_email: string;
   reason: string;
   status: AccessRequestStatus;

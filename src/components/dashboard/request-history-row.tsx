@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export function RequestHistoryRow({
+  requesterName,
   requesterEmail,
   assetName,
   reason,
@@ -11,6 +12,7 @@ export function RequestHistoryRow({
   createdAt,
   processedAt,
 }: {
+  requesterName?: string | null;
   requesterEmail: string;
   assetName?: string;
   reason: string;
@@ -29,7 +31,10 @@ export function RequestHistoryRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-zinc-900 flex items-center gap-1.5">
               <MailIcon className="size-3.5 text-zinc-400" />
-              {requesterEmail}
+              <span>{requesterName?.trim() || requesterEmail}</span>
+              {requesterName?.trim() ? (
+                <span className="text-xs font-medium text-zinc-400">{requesterEmail}</span>
+              ) : null}
             </span>
             {assetName && (
               <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-4 border-zinc-100 text-zinc-400">

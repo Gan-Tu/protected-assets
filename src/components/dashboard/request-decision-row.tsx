@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 export function RequestDecisionRow({
   requestId,
+  requesterName,
   requesterEmail,
   assetName,
   reason,
@@ -15,6 +16,7 @@ export function RequestDecisionRow({
   autoApproveLabel,
 }: {
   requestId: string;
+  requesterName?: string | null;
   requesterEmail: string;
   assetName: string;
   reason: string;
@@ -43,7 +45,10 @@ export function RequestDecisionRow({
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
               <MailIcon className="size-3.5 text-zinc-400" />
-              {requesterEmail}
+              <span>{requesterName?.trim() || requesterEmail}</span>
+              {requesterName?.trim() ? (
+                <span className="text-xs font-medium text-zinc-400">{requesterEmail}</span>
+              ) : null}
             </div>
             <p className="text-sm text-zinc-600 leading-relaxed italic border-l-2 border-zinc-100 pl-4">
               &ldquo;{reason}&rdquo;

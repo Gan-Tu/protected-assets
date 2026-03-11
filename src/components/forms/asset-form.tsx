@@ -57,7 +57,7 @@ export function AssetForm({
 }) {
   const [state, formAction] = useActionState(action, initialState);
   const [autoApproveEnabled, setAutoApproveEnabled] = useState(
-    asset?.auto_approve_enabled ?? true,
+    asset?.auto_approve_enabled ?? false,
   );
   const [linkInputs, setLinkInputs] = useState<string[]>(getInitialLinkInputs(asset, links));
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -381,7 +381,7 @@ export function AssetForm({
               <input
                 type="checkbox"
                 name="auto_approve_enabled"
-                defaultChecked={asset?.auto_approve_enabled ?? true}
+                defaultChecked={asset?.auto_approve_enabled ?? false}
                 className="mt-1 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                 onChange={(event) => setAutoApproveEnabled(event.target.checked)}
               />

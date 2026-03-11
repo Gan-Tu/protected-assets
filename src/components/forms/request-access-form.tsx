@@ -31,8 +31,11 @@ export function RequestAccessForm({
         </div>
         <div className="space-y-2">
           <h3 className="text-lg font-bold text-zinc-900">Request Submitted</h3>
-          <p className="text-sm text-zinc-500 leading-relaxed max-w-xs mx-auto">
-            {state.success}. You will receive an email once the owner reviews your request.
+          <p className="text-sm text-zinc-500 leading-relaxed max-w-sm mx-auto">
+            {state.success} You will receive an email from <span className="font-medium text-zinc-700">protected-assets@tugan.app</span> when your request is granted or denied.
+          </p>
+          <p className="text-xs text-zinc-400 leading-relaxed max-w-sm mx-auto">
+            If you do not see it, check your spam folder.
           </p>
         </div>
       </div>
@@ -42,6 +45,17 @@ export function RequestAccessForm({
   return (
     <form action={formAction} className="space-y-5">
       <input type="hidden" name="slug" value={slug} />
+      <div className="grid gap-2">
+        <Label htmlFor="requester_name" className="text-zinc-700 text-sm font-medium">Name</Label>
+        <Input
+          id="requester_name"
+          name="requester_name"
+          type="text"
+          placeholder="Your name"
+          className="bg-zinc-50/50"
+          required
+        />
+      </div>
       <div className="grid gap-2">
         <Label htmlFor="requester_email" className="text-zinc-700 text-sm font-medium">Email</Label>
         <Input

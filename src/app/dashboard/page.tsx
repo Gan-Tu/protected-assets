@@ -105,6 +105,7 @@ export default async function DashboardPage({
                   <RequestDecisionRow
                     key={request.id}
                     requestId={request.id}
+                    requesterName={request.requester_name}
                     requesterEmail={request.requester_email}
                     assetName={request.asset.name}
                     reason={request.reason}
@@ -149,6 +150,7 @@ export default async function DashboardPage({
                   {processedRequests.map((request) => (
                     <RequestHistoryRow
                       key={request.id}
+                      requesterName={request.requester_name}
                       requesterEmail={request.requester_email}
                       assetName={request.asset?.name}
                       reason={request.reason}

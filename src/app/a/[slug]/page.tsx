@@ -64,7 +64,7 @@ export default async function ProtectedAssetPage({
             
             <p className="text-base text-zinc-600 leading-relaxed">
               {asset.description ||
-                "This asset is protected. Submit your email and reason to request access."}
+                "This asset is protected. Submit your name, email, and reason to request access."}
             </p>
 
             <div className="space-y-4 pt-4">
@@ -123,7 +123,7 @@ export default async function ProtectedAssetPage({
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl font-bold">Request Access</CardTitle>
             <CardDescription className="text-sm">
-              Provide your details to request this protected asset.
+              Provide your name, email, and reason to request this protected asset.
             </CardDescription>
           </CardHeader>
           <CardContent>

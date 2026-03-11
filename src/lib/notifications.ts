@@ -219,6 +219,7 @@ export async function sendOwnerRequestNotification(input: {
   ownerName?: string | null;
   assetName: string;
   assetSlug: string;
+  requesterName: string;
   requesterEmail: string;
   reason: string;
   autoApproveDelaySeconds: number;
@@ -231,6 +232,7 @@ export async function sendOwnerRequestNotification(input: {
       ? formatRelativeWindow(input.autoApproveDelaySeconds)
       : "manual approval only";
   const ownerLabel = input.ownerName?.trim() || input.ownerEmail;
+  const requesterLabel = `${input.requesterName} <${input.requesterEmail}>`;
 
   if (input.sendEmailNotification) {
     await sendEmail({
@@ -239,12 +241,12 @@ export async function sendOwnerRequestNotification(input: {
       idempotencyKey: `owner-request/${input.requestId}`,
       html: renderEmailLayout({
         eyebrow: "Access request",
-        title: `${input.requesterEmail} wants access`,
+        title: `${escapeHtml(input.requesterName)} wants access`,
         intro: `A new request came in for ${input.assetName}. Review the request and either release the asset or decline it.`,
         accent: "amber",
         sections: [
           renderDetailSection("Request details", [
-            { label: "Requester", value: escapeHtml(input.requesterEmail) },
+            { label: "Requester", value: escapeHtml(requesterLabel) },
             { label: "Asset", value: escapeHtml(input.assetName) },
             { label: "Auto-release window", value: escapeHtml(timeframe) },
             {
@@ -260,7 +262,7 @@ export async function sendOwnerRequestNotification(input: {
         },
         footer: `Notification for ${ownerLabel}`,
       }),
-      text: `New access request\n\nRequester: ${input.requesterEmail}\nAsset: ${input.assetName}\nReason:\n${input.reason}\n\nAuto-release window: ${timeframe}\nReview in dashboard: ${dashboardUrl}\nShare page: ${shareUrl}`,
+      text: `New access request\n\nRequester: ${requesterLabel}\nAsset: ${input.assetName}\nReason:\n${input.reason}\n\nAuto-release window: ${timeframe}\nReview in dashboard: ${dashboardUrl}\nShare page: ${shareUrl}`,
     });
   }
 
@@ -278,7 +280,7 @@ export async function sendOwnerRequestNotification(input: {
     const body = new URLSearchParams({
       To: input.ownerPhone,
       From: process.env.TWILIO_FROM_NUMBER,
-      Body: `${input.requesterEmail} requested assets \'${input.assetName}\'. Reason: ${input.reason}`,
+      Body: `${requesterLabel} requested assets \'${input.assetName}\'. Reason: ${input.reason}`,
     });
 
     await fetch(
