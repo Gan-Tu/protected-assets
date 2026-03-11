@@ -5,6 +5,7 @@ import { ClockIcon, GlobeIcon, InfoIcon, PlusIcon, ShieldCheckIcon, Trash2Icon, 
 
 import type { AssetFormState } from "@/app/dashboard/actions";
 import { SubmitButton } from "@/components/app/submit-button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 const initialState: AssetFormState = {};
 const SERVER_ACTION_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
+type CollectionMode = "existing" | "new";
 
 function splitDelay(totalSeconds: number) {
   const days = Math.floor(totalSeconds / 86400);
@@ -59,6 +61,9 @@ export function AssetForm({
   const [autoApproveEnabled, setAutoApproveEnabled] = useState(
     asset?.auto_approve_enabled ?? false,
   );
+  const [collectionMode, setCollectionMode] = useState<CollectionMode>("existing");
+  const [selectedGroupId, setSelectedGroupId] = useState(asset?.group_id ?? "");
+  const [newGroupName, setNewGroupName] = useState("");
   const [linkInputs, setLinkInputs] = useState<string[]>(getInitialLinkInputs(asset, links));
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const delayValues = useMemo(
@@ -167,20 +172,55 @@ export function AssetForm({
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="group_id" className="text-zinc-700">Collection</Label>
-                <select
-                  id="group_id"
-                  name="group_id"
-                  defaultValue={asset?.group_id ?? ""}
-                  className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:ring-1 focus:ring-zinc-400"
-                >
-                  <option value="">No collection</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="group_id" className="text-zinc-700">Collection</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="cursor-pointer px-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900"
+                    onClick={() =>
+                      setCollectionMode((current) =>
+                        current === "new" ? "existing" : "new",
+                      )
+                    }
+                  >
+                    {collectionMode === "new" ? "Use existing" : "Create new"}
+                  </Button>
+                </div>
+
+                {collectionMode === "new" ? (
+                  <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
+                    <input type="hidden" name="group_id" value="" />
+                    <Input
+                      id="new_group_name"
+                      name="new_group_name"
+                      value={newGroupName}
+                      onChange={(event) => setNewGroupName(event.target.value)}
+                      placeholder="e.g. Investor Updates"
+                      className="bg-white"
+                      required
+                    />
+                    <p className="text-xs text-zinc-500">
+                      A new collection will be created when you save this asset.
+                    </p>
+                  </div>
+                ) : (
+                  <select
+                    id="group_id"
+                    name="group_id"
+                    value={selectedGroupId}
+                    onChange={(event) => setSelectedGroupId(event.target.value)}
+                    className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:ring-1 focus:ring-zinc-400"
+                  >
+                    <option value="">No collection</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 

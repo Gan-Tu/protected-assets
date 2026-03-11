@@ -354,11 +354,70 @@ function buildLegacyLinks(
   ];
 }
 
+async function resolveAssetGroupId(
+  ownerId: string,
+  input: {
+    groupId: string | null;
+    newGroupName: string;
+  },
+) {
+  const admin = createAdminSupabaseClient();
+  const newGroupName = input.newGroupName.trim();
+
+  if (newGroupName) {
+    const { data: groups, error: groupsError } = await admin
+      .from("asset_groups")
+      .select("id, name")
+      .eq("owner_id", ownerId)
+      .order("name");
+
+    if (groupsError) throw groupsError;
+
+    const existingGroup = (groups ?? []).find(
+      (group) => group.name.trim().toLowerCase() === newGroupName.toLowerCase(),
+    );
+
+    if (existingGroup) {
+      return existingGroup.id;
+    }
+
+    const { data: createdGroup, error: createGroupError } = await admin
+      .from("asset_groups")
+      .insert({
+        owner_id: ownerId,
+        name: newGroupName,
+      })
+      .select("id")
+      .single();
+
+    if (createGroupError) throw createGroupError;
+
+    return createdGroup.id;
+  }
+
+  if (!input.groupId) {
+    return null;
+  }
+
+  const { data: existingGroup, error: groupError } = await admin
+    .from("asset_groups")
+    .select("id")
+    .eq("id", input.groupId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  if (groupError) throw groupError;
+  if (!existingGroup) throw new Error("Selected collection was not found.");
+
+  return existingGroup.id;
+}
+
 export async function saveAsset(ownerId: string, formData: FormData, assetId?: string) {
   const admin = createAdminSupabaseClient();
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const groupId = String(formData.get("group_id") ?? "").trim() || null;
+  const submittedGroupId = String(formData.get("group_id") ?? "").trim() || null;
+  const newGroupName = String(formData.get("new_group_name") ?? "").trim();
   const linkUrls = formData
     .getAll("link_url")
     .map((entry) => String(entry).trim())
@@ -375,6 +434,10 @@ export async function saveAsset(ownerId: string, formData: FormData, assetId?: s
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 
   const slug = await ensureUniqueSlug(slugInput || name, ownerId, assetId);
+  const groupId = await resolveAssetGroupId(ownerId, {
+    groupId: submittedGroupId,
+    newGroupName,
+  });
 
   let existingFiles: AssetFile[] = [];
 
