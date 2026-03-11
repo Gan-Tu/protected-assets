@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getBaseUrl, getErrorMessage } from "@/lib/utils";
+import { getErrorMessage, getRequestBaseUrl } from "@/lib/utils";
 
 export type AuthActionState = {
   error?: string;
@@ -35,6 +35,7 @@ export async function signUpAction(
   formData: FormData,
 ): Promise<AuthActionState> {
   const supabase = await createServerSupabaseClient();
+  const baseUrl = await getRequestBaseUrl();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
@@ -42,7 +43,7 @@ export async function signUpAction(
     email,
     password,
     options: {
-      emailRedirectTo: `${getBaseUrl()}/auth/callback?next=/dashboard`,
+      emailRedirectTo: `${baseUrl}/auth/callback?next=/dashboard`,
     },
   });
 

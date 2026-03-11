@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import { headers } from "next/headers";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -93,6 +94,34 @@ export function getBaseUrl() {
 
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return "http://localhost:3000";
+}
+
+export async function getRequestBaseUrl() {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  const headerStore = await headers();
+  const forwardedHost = headerStore.get("x-forwarded-host");
+  const host = (forwardedHost ?? headerStore.get("host") ?? "")
+    .split(",")[0]
+    .trim();
+
+  if (host) {
+    const forwardedProto = headerStore.get("x-forwarded-proto");
+    const protocol =
+      forwardedProto ??
+      (host.includes("localhost") || host.startsWith("127.0.0.1")
+        ? "http"
+        : "https");
+
+    return `${protocol}://${host}`;
   }
 
   return "http://localhost:3000";
