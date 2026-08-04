@@ -29,6 +29,10 @@ export function compactFileSize(bytes: number | null | undefined) {
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+/**
+ * Locale/timezone of whoever runs this. Safe in the browser; on the server it
+ * reflects the server's timezone, so components render it only after mount.
+ */
 export function formatHumanDateTime(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
 
@@ -43,6 +47,39 @@ export function formatHumanDateTime(value: string | Date) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+/** Deterministic on both server and client, so it is safe to hydrate. */
+export function formatUtcDateTime(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  }).format(date);
+}
+
+/** When a pending request will auto-release, or null if it never will. */
+export function getAutoReleaseTargetIso(input: {
+  createdAt: string;
+  enabled: boolean;
+  delaySeconds: number;
+}): string | null {
+  if (!input.enabled) return null;
+
+  const created = Date.parse(input.createdAt);
+  if (Number.isNaN(created)) return null;
+
+  return new Date(created + input.delaySeconds * 1000).toISOString();
 }
 
 export function formatRelativeWindow(

@@ -3,26 +3,24 @@
 import { useActionState } from "react";
 import { UserIcon, BellIcon, PhoneIcon } from "lucide-react";
 
-import type { SettingsFormState } from "@/app/dashboard/actions";
+import { StatusMessage } from "@/components/app/status-message";
 import { SubmitButton } from "@/components/app/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { IDLE_STATE, type ActionState } from "@/lib/action-state";
 import type { Profile } from "@/lib/types";
-
-const initialState: SettingsFormState = {};
+import { LIMITS } from "@/lib/validation";
 
 export function ProfileSettingsForm({
   action,
   profile,
 }: {
-  action: (
-    state: SettingsFormState,
-    formData: FormData,
-  ) => Promise<SettingsFormState>;
+  action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   profile: Profile;
 }) {
-  const [state, formAction] = useActionState(action, initialState);
+  const [state, formAction] = useActionState(action, IDLE_STATE);
+  const fieldErrors = state.fieldErrors ?? {};
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -54,10 +52,20 @@ export function ProfileSettingsForm({
               <Input
                 id="phone"
                 name="phone"
+                type="tel"
+                autoComplete="tel"
                 defaultValue={profile.phone ?? ""}
                 placeholder="+1 415 555 0123"
+                maxLength={LIMITS.phone}
                 className="bg-white border-zinc-200"
+                aria-invalid={Boolean(fieldErrors.phone)}
+                aria-describedby={fieldErrors.phone ? "phone-error" : undefined}
               />
+              {fieldErrors.phone ? (
+                <p id="phone-error" className="text-xs text-red-600">
+                  {fieldErrors.phone}
+                </p>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -103,17 +111,13 @@ export function ProfileSettingsForm({
                 </label>
               </div>
 
-              {state.error && (
-                <div className="p-3 rounded-md bg-red-50 border border-red-100 text-sm text-red-600">
-                  {state.error}
-                </div>
-              )}
-              
-              {state.success && (
-                <div className="p-3 rounded-md bg-emerald-50 border border-emerald-100 text-sm text-emerald-600">
-                  {state.success}
-                </div>
-              )}
+              {state.status === "error" && state.message ? (
+                <StatusMessage status="error">{state.message}</StatusMessage>
+              ) : null}
+
+              {state.status === "success" && state.message ? (
+                <StatusMessage status="success">{state.message}</StatusMessage>
+              ) : null}
 
               <div className="pt-4 border-t border-zinc-100">
                 <SubmitButton className="w-full sm:w-auto font-bold shadow-sm" pendingLabel="Saving...">

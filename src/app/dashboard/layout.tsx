@@ -3,13 +3,11 @@ import { LayoutGridIcon, LogOutIcon, Settings2Icon } from "lucide-react";
 
 import { signOutAction } from "@/app/auth/actions";
 import { LogoMark } from "@/components/app/logo-mark";
-import { requireOwner } from "@/lib/data";
+import { requireOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 const navLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 sm:px-3 sm:py-2";
-const ghostActionClass =
   "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 sm:px-3 sm:py-2";
 
 const navItems = [
@@ -42,10 +40,7 @@ export default async function DashboardLayout({
             ))}
             <div className="hidden h-4 w-px bg-zinc-200 mx-2 sm:block" />
             <form action={signOutAction}>
-              <button
-                type="submit"
-                className={ghostActionClass}
-              >
+              <button type="submit" className={navLinkClass}>
                 <LogOutIcon className="size-4" />
                 Sign out
               </button>

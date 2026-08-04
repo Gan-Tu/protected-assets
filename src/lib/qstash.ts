@@ -3,6 +3,7 @@ import "server-only";
 import { Client } from "@upstash/qstash";
 
 import { getBaseUrl, getErrorMessage, isLocalUrl } from "@/lib/utils";
+import { LIMITS } from "@/lib/validation";
 
 function getQStashClient() {
   if (!process.env.QSTASH_TOKEN) {
@@ -21,7 +22,23 @@ export function getQStashCallbackUrl() {
   return getBaseUrl();
 }
 
-export async function scheduleAutoRelease(requestId: string, delaySeconds: number) {
+export type ScheduleResult = {
+  scheduled: boolean;
+  messageId?: string;
+  reason?: string;
+};
+
+/**
+ * Schedule the auto-release callback.
+ *
+ * Never throws: callers degrade to manual review (or an inline release) when
+ * the scheduler is unavailable, so a QStash outage cannot take down the public
+ * request form.
+ */
+export async function scheduleAutoRelease(
+  requestId: string,
+  delaySeconds: number,
+): Promise<ScheduleResult> {
   const client = getQStashClient();
   const callbackBaseUrl = getQStashCallbackUrl();
 
@@ -40,16 +57,25 @@ export async function scheduleAutoRelease(requestId: string, delaySeconds: numbe
     };
   }
 
-  const result = await client.publishJSON({
-    url: `${callbackBaseUrl}/api/qstash/auto-release`,
-    body: { requestId },
-    delay: `${BigInt(delaySeconds)}s`,
-  });
+  const clampedDelay = Math.min(
+    Math.max(Math.floor(delaySeconds), 0),
+    LIMITS.maxAutoReleaseSeconds,
+  );
 
-  return {
-    scheduled: true,
-    messageId: result.messageId,
-  };
+  try {
+    const result = await client.publishJSON({
+      url: `${callbackBaseUrl}/api/qstash/auto-release`,
+      body: { requestId },
+      delay: `${BigInt(clampedDelay)}s`,
+    });
+
+    return { scheduled: true, messageId: result.messageId };
+  } catch (error) {
+    return {
+      scheduled: false,
+      reason: getErrorMessage(error, "Unable to schedule auto-release."),
+    };
+  }
 }
 
 export async function cancelAutoRelease(messageId?: string | null) {

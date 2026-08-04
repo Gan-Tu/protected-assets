@@ -7,5 +7,13 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  /**
+   * Session refresh only matters for routes that render owner UI. `api/` (the
+   * QStash webhook) and `d/` (requester downloads) are authenticated by
+   * signature or by capability URL, so running Supabase auth there only added
+   * a network round-trip per call.
+   */
+  matcher: [
+    "/((?!api/|d/|_next/static|_next/image|favicon.ico|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

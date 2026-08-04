@@ -4,7 +4,7 @@ import { ArrowRightIcon, Clock3Icon, FolderLockIcon, SparklesIcon, ChevronRightI
 import { LogoMark } from "@/components/app/logo-mark";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLandingUser } from "@/lib/data";
+import { hasSessionCookie } from "@/lib/auth";
 
 const primaryLinkClass =
   "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-900 px-5 py-2.5 text-center text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 sm:w-auto sm:whitespace-nowrap";
@@ -28,7 +28,9 @@ const features = [
 ];
 
 export default async function Home() {
-  const user = await getLandingUser();
+  // Only picks a nav label, so a cookie check beats a network round-trip to
+  // Supabase on every landing-page hit. The dashboard still does real auth.
+  const user = await hasSessionCookie();
 
   return (
     <main className="relative min-h-screen bg-white text-zinc-950 selection:bg-zinc-100">

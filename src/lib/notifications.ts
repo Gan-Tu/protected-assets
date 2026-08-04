@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 
+import { AppError, logError } from "@/lib/errors";
 import { formatRelativeWindow, getBaseUrl } from "@/lib/utils";
 
 type EmailPayload = {
@@ -191,12 +192,20 @@ function renderResourceSection(input: {
   `;
 }
 
+/**
+ * Sending is mandatory, not best-effort. An unconfigured mailer used to make
+ * releases look successful while nothing was delivered; now it fails so the
+ * caller can roll the request back to `pending` and retry.
+ */
 async function sendEmail(payload: EmailPayload) {
   if (!resend || !process.env.RESEND_FROM_EMAIL) {
-    return { skipped: true };
+    throw new AppError(
+      "Email delivery is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL.",
+      { status: 500 },
+    );
   }
 
-  await resend.emails.send(
+  const { error } = await resend.emails.send(
     {
       from: process.env.RESEND_FROM_EMAIL,
       to: payload.to,
@@ -207,6 +216,15 @@ async function sendEmail(payload: EmailPayload) {
     },
     { idempotencyKey: payload.idempotencyKey },
   );
+
+  // The Resend SDK reports failures in the payload rather than throwing.
+  if (error) {
+    logError("email.send", error);
+    throw new AppError(
+      "We could not send that email. Please try again in a moment.",
+      { status: 502 },
+    );
+  }
 
   return { skipped: false };
 }
@@ -277,23 +295,41 @@ export async function sendOwnerRequestNotification(input: {
       `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`,
     ).toString("base64");
 
+    // SMS bodies are billed per segment, so keep the free-text reason bounded.
+    const smsReason =
+      input.reason.length > 240
+        ? `${input.reason.slice(0, 237)}...`
+        : input.reason;
+
     const body = new URLSearchParams({
       To: input.ownerPhone,
       From: process.env.TWILIO_FROM_NUMBER,
-      Body: `${requesterLabel} requested assets \'${input.assetName}\'. Reason: ${input.reason}`,
+      Body: `${requesterLabel} requested access to '${input.assetName}'. Reason: ${smsReason}`,
     });
 
-    await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${auth}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+    // SMS is a convenience channel: log failures, never fail the caller.
+    try {
+      const response = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body,
         },
-        body,
-      },
-    );
+      );
+
+      if (!response.ok) {
+        logError(
+          "sms.send",
+          new Error(`Twilio responded ${response.status}: ${await response.text()}`),
+        );
+      }
+    } catch (error) {
+      logError("sms.send", error);
+    }
   }
 }
 
@@ -309,11 +345,16 @@ export async function sendRequesterReleaseEmail(input: {
   attachments?: { filename: string; content: Buffer; content_type?: string }[];
   fileLinks?: { name: string; url: string }[];
   shareUrl: string;
+  expiresInSeconds?: number;
 }) {
   const releaseCopy =
     input.releaseMode === "auto_approved"
       ? "The timed release window has passed, so your access was automatically approved."
       : "Your access request was approved.";
+  const expiryCopy =
+    input.fileLinks?.length && input.expiresInSeconds
+      ? `Download links stay active for ${formatRelativeWindow(input.expiresInSeconds, { verbose: true })} and can be revoked by the owner.`
+      : null;
 
   await sendEmail({
     to: [input.requesterEmail],
@@ -345,9 +386,11 @@ export async function sendRequesterReleaseEmail(input: {
           fileLinks: input.fileLinks,
         }),
       ],
-      footer: "This message contains secure access details for a protected asset.",
+      footer:
+        expiryCopy ??
+        "This message contains secure access details for a protected asset.",
     }),
-    text: `${releaseCopy}\n\nAsset: ${input.assetName}\n${input.assetDescription ? `Description: ${input.assetDescription}\n` : ""}Share page: ${input.shareUrl}\n${input.releaseNote ? `\nAccess Note:\n${input.releaseNote}\n` : ""}${input.decisionNote ? `\nApproval note:\n${input.decisionNote}\n` : ""}${input.links?.map((link) => `Protected link ${summarizeUrl(link.url)}: ${link.url}`).join("\n") ?? ""}${input.attachments?.length ? `\nAttached files:\n${input.attachments.map((attachment) => `- ${attachment.filename}`).join("\n")}\n` : ""}${input.fileLinks?.map((file) => `\nDownload ${file.name}: ${file.url}`).join("") ?? ""}`,
+    text: `${releaseCopy}${expiryCopy ? `\n${expiryCopy}` : ""}\n\nAsset: ${input.assetName}\n${input.assetDescription ? `Description: ${input.assetDescription}\n` : ""}Share page: ${input.shareUrl}\n${input.releaseNote ? `\nAccess Note:\n${input.releaseNote}\n` : ""}${input.decisionNote ? `\nApproval note:\n${input.decisionNote}\n` : ""}${input.links?.map((link) => `Protected link ${summarizeUrl(link.url)}: ${link.url}`).join("\n") ?? ""}${input.attachments?.length ? `\nAttached files:\n${input.attachments.map((attachment) => `- ${attachment.filename}`).join("\n")}\n` : ""}${input.fileLinks?.map((file) => `\nDownload ${file.name}: ${file.url}`).join("") ?? ""}`,
     attachments: input.attachments,
   });
 }

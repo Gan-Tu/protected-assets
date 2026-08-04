@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 export function ConfirmSubmitButton({
   formId,
   triggerLabel,
+  triggerAriaLabel,
   title,
   description,
   confirmLabel,
@@ -27,6 +28,8 @@ export function ConfirmSubmitButton({
 }: {
   formId: string;
   triggerLabel: string;
+  /** Required when the trigger is icon-only, so it is not an unlabelled button. */
+  triggerAriaLabel?: string;
   title: string;
   description: string;
   confirmLabel: string;
@@ -43,7 +46,12 @@ export function ConfirmSubmitButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button type="button" variant={triggerVariant} className={triggerClassName} />
+          <Button
+            type="button"
+            variant={triggerVariant}
+            className={triggerClassName}
+            aria-label={triggerAriaLabel ?? (triggerLabel || title)}
+          />
         }
       >
         {icon}
