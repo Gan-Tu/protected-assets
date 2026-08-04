@@ -1,45 +1,67 @@
-"use client";
-
-import { motion } from "framer-motion";
-
+/**
+ * Decorative background for the auth pages.
+ *
+ * Previously this pulled in framer-motion (~50 KB) to rotate an SVG and pulse
+ * three dots. CSS keyframes do the same thing with no JavaScript at all, so
+ * this is now a server component. Both animations respect prefers-reduced-motion.
+ */
 export function AmbientOrbits() {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <motion.svg
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+    >
+      <svg
         viewBox="0 0 600 600"
-        className="absolute left-1/2 top-1/2 h-[42rem] w-[42rem] -translate-x-1/2 -translate-y-1/2 opacity-80"
-        initial={{ rotate: 0 }}
-        animate={{ rotate: 360 }}
-        transition={{ duration: 30, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+        className="absolute left-1/2 top-1/2 h-[42rem] w-[42rem] -translate-x-1/2 -translate-y-1/2 opacity-80 motion-safe:animate-[orbit-spin_30s_linear_infinite]"
+        style={{ transformOrigin: "center" }}
       >
-        <circle cx="300" cy="300" r="180" fill="none" stroke="rgba(148,163,184,0.18)" />
-        <circle cx="300" cy="300" r="230" fill="none" stroke="rgba(125,211,252,0.16)" />
-        <circle cx="300" cy="300" r="110" fill="none" stroke="rgba(249,115,22,0.18)" />
-        <motion.circle
+        <circle
+          cx="300"
+          cy="300"
+          r="180"
+          fill="none"
+          stroke="rgba(148,163,184,0.18)"
+        />
+        <circle
+          cx="300"
+          cy="300"
+          r="230"
+          fill="none"
+          stroke="rgba(125,211,252,0.16)"
+        />
+        <circle
+          cx="300"
+          cy="300"
+          r="110"
+          fill="none"
+          stroke="rgba(249,115,22,0.18)"
+        />
+        <circle
           cx="300"
           cy="120"
           r="12"
           fill="#0f172a"
-          animate={{ scale: [1, 1.15, 1] }}
-          transition={{ duration: 2.4, repeat: Number.POSITIVE_INFINITY }}
+          className="motion-safe:animate-[orbit-pulse_2.4s_ease-in-out_infinite]"
+          style={{ transformOrigin: "300px 120px" }}
         />
-        <motion.circle
+        <circle
           cx="124"
           cy="300"
           r="8"
           fill="#7dd3fc"
-          animate={{ scale: [1, 1.4, 1] }}
-          transition={{ duration: 2.8, repeat: Number.POSITIVE_INFINITY, delay: 0.4 }}
+          className="motion-safe:animate-[orbit-pulse_2.8s_ease-in-out_infinite]"
+          style={{ transformOrigin: "124px 300px", animationDelay: "0.4s" }}
         />
-        <motion.circle
+        <circle
           cx="460"
           cy="300"
           r="9"
           fill="#f97316"
-          animate={{ scale: [1, 1.35, 1] }}
-          transition={{ duration: 3.1, repeat: Number.POSITIVE_INFINITY, delay: 0.8 }}
+          className="motion-safe:animate-[orbit-pulse_3.1s_ease-in-out_infinite]"
+          style={{ transformOrigin: "460px 300px", animationDelay: "0.8s" }}
         />
-      </motion.svg>
+      </svg>
     </div>
   );
 }

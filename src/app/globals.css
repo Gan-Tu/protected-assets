@@ -76,3 +76,23 @@ button {
 ::selection {
   background: rgba(24, 24, 27, 0.1);
 }
+
+/* Auth page ambience -- replaces a framer-motion dependency. */
+@keyframes orbit-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes orbit-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+}

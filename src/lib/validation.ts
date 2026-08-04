@@ -33,13 +33,19 @@ export const protectedUrlSchema = z
   .url({ protocol: /^https?$/ })
   .max(LIMITS.url, `Links must be under ${LIMITS.url} characters.`);
 
+/**
+ * Normalize before validating, not after: people paste addresses with trailing
+ * spaces and mixed case, and `z.email()` runs before any `.transform()` would.
+ */
+export const emailSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim().toLowerCase() : value),
+  z.email("Enter a valid email address.").max(LIMITS.email),
+);
+
 export const accessRequestSchema = z.object({
   slug: trimmed(LIMITS.slug).min(1, "Missing asset."),
   requesterName: trimmed(LIMITS.name).min(1, "Your name is required."),
-  requesterEmail: z
-    .email("Enter a valid email address.")
-    .max(LIMITS.email)
-    .transform((value) => value.trim().toLowerCase()),
+  requesterEmail: emailSchema,
   reason: trimmed(LIMITS.reason).min(
     1,
     "Tell the owner why you need access.",
@@ -112,7 +118,7 @@ export const profileSettingsSchema = z.object({
 });
 
 export const credentialsSchema = z.object({
-  email: z.email("Enter a valid email address.").max(LIMITS.email),
+  email: emailSchema,
   password: z
     .string()
     .min(8, "Passwords must be at least 8 characters.")
