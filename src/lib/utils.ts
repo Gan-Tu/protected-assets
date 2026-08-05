@@ -125,6 +125,15 @@ export function coerceBoolean(value: FormDataEntryValue | null) {
 }
 
 export function getBaseUrl() {
+  /**
+   * On preview deployments the configured app URL points at production, which
+   * would make share pages and download links in emails jump to a different
+   * build. Prefer the deployment's own URL there so a preview is self-contained.
+   */
+  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
   const explicit = process.env.NEXT_PUBLIC_APP_URL;
   if (explicit) return explicit.replace(/\/$/, "");
 
