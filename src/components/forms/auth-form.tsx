@@ -1,22 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
-import { ChevronRightIcon, LockKeyholeIcon } from "lucide-react";
+import { useActionState, useEffect, useRef } from "react";
+import { MailCheckIcon } from "lucide-react";
 
 import type { AuthActionState } from "@/app/auth/actions";
 import { StatusMessage } from "@/components/app/status-message";
 import { SubmitButton } from "@/components/app/submit-button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { PasswordInput } from "@/components/marketing/password-input";
+import { buttonVariants } from "@/components/ui/button";
+import { describedBy, Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { IDLE_STATE } from "@/lib/action-state";
+import { cn } from "@/lib/utils";
+
+const PASSWORD_HINT = "At least 8 characters.";
+
+const inlineLinkClass =
+  "rounded-sm font-medium text-primary underline-offset-4 outline-none transition-colors duration-150 ease-out-soft hover:text-primary-hover hover:underline focus-visible:ring-4 focus-visible:ring-primary/25";
 
 export function AuthForm({
   title,
@@ -34,103 +35,126 @@ export function AuthForm({
 }) {
   const [state, formAction] = useActionState(action, IDLE_STATE);
   const fieldErrors = state.fieldErrors ?? {};
+  const isSignIn = mode === "sign-in";
+
+  // Sign-up only comes back with "success" when email confirmation is on;
+  // otherwise the action redirects straight to the dashboard.
+  if (!isSignIn && state.status === "success") {
+    return <CheckInbox message={state.message} />;
+  }
+
+  const passwordHint = isSignIn ? undefined : PASSWORD_HINT;
 
   return (
-    <Card className="mx-auto w-full max-w-md overflow-hidden border-zinc-200 shadow-xl">
-      <CardHeader className="space-y-4 border-b border-zinc-100 bg-zinc-50/50 pb-6 pt-8">
-        <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex size-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-900 shadow-sm">
-            <LockKeyholeIcon className="size-5" aria-hidden />
-          </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-zinc-900">
-            {title}
-          </CardTitle>
-          <CardDescription className="max-w-[280px] text-sm text-zinc-600">
-            {description}
-          </CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6 pt-8">
-        <form action={formAction} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="email"
-              className="text-xs font-bold uppercase tracking-wider text-zinc-700"
-            >
-              Email
-            </Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="name@company.com"
-              className="bg-zinc-50/30"
-              aria-invalid={Boolean(fieldErrors.email)}
-              aria-describedby={fieldErrors.email ? "email-error" : undefined}
-              required
-            />
-            {fieldErrors.email ? (
-              <p id="email-error" className="text-xs text-red-600">
-                {fieldErrors.email}
-              </p>
-            ) : null}
-          </div>
+    <div>
+      <h1 className="text-2xl leading-tight font-semibold tracking-tight text-foreground">
+        {title}
+      </h1>
+      <p className="mt-2 text-[0.9375rem] leading-relaxed text-pretty text-muted-foreground">
+        {description}
+      </p>
 
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="password"
-              className="text-xs font-bold uppercase tracking-wider text-zinc-700"
-            >
-              Password
-            </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={
-                mode === "sign-in" ? "current-password" : "new-password"
-              }
-              placeholder="At least 8 characters"
-              className="bg-zinc-50/30"
-              minLength={8}
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby="password-hint"
-              required
-            />
-            <p id="password-hint" className="text-xs text-zinc-500">
-              {fieldErrors.password ?? "At least 8 characters."}
-            </p>
-          </div>
+      <form action={formAction} className="mt-8 grid gap-5">
+        {state.status === "error" && state.message ? (
+          <StatusMessage status="error">{state.message}</StatusMessage>
+        ) : null}
+        {state.status === "success" && state.message ? (
+          <StatusMessage status="success">{state.message}</StatusMessage>
+        ) : null}
 
-          {state.status === "error" && state.message ? (
-            <StatusMessage status="error">{state.message}</StatusMessage>
-          ) : null}
+        <Field id="email" label="Email" error={fieldErrors.email}>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="name@company.com"
+            className="h-11"
+            aria-invalid={Boolean(fieldErrors.email)}
+            aria-describedby={describedBy("email", { error: fieldErrors.email })}
+            required
+          />
+        </Field>
 
-          {state.status === "success" && state.message ? (
-            <StatusMessage status="success">{state.message}</StatusMessage>
-          ) : null}
+        <Field
+          id="password"
+          label="Password"
+          hint={passwordHint}
+          error={fieldErrors.password}
+        >
+          <PasswordInput
+            id="password"
+            name="password"
+            autoComplete={isSignIn ? "current-password" : "new-password"}
+            className="h-11"
+            minLength={8}
+            aria-invalid={Boolean(fieldErrors.password)}
+            aria-describedby={describedBy("password", {
+              hint: passwordHint,
+              error: fieldErrors.password,
+            })}
+            required
+          />
+        </Field>
 
-          <SubmitButton
-            className="h-11 w-full font-bold shadow-sm"
-            pendingLabel="Processing..."
-          >
-            {mode === "sign-in" ? "Sign in" : "Create account"}
-            <ChevronRightIcon className="ml-2 size-4" aria-hidden />
-          </SubmitButton>
-        </form>
+        <SubmitButton
+          size="lg"
+          className="mt-1 w-full"
+          pendingLabel={isSignIn ? "Signing in…" : "Creating account…"}
+        >
+          {isSignIn ? "Sign in" : "Create account"}
+        </SubmitButton>
+      </form>
 
-        <div className="text-center">
-          <Link
-            href={mode === "sign-in" ? "/auth/sign-up" : "/auth/sign-in"}
-            className="text-xs font-medium text-zinc-600 underline underline-offset-4 transition-colors hover:text-zinc-900"
-          >
-            {mode === "sign-in"
-              ? "Don't have an account? Sign up"
-              : "Already have an account? Sign in"}
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+      <p className="mt-8 text-center text-sm text-muted-foreground">
+        {isSignIn ? "New to Protected Assets?" : "Already have an account?"}{" "}
+        <Link
+          href={isSignIn ? "/auth/sign-up" : "/auth/sign-in"}
+          className={inlineLinkClass}
+        >
+          {isSignIn ? "Create an account" : "Sign in"}
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Replaces the form once the account exists but still needs confirming. Focus
+ * moves to the heading so screen readers announce the new state and keyboard
+ * users are not left on a button that no longer exists.
+ */
+function CheckInbox({ message }: { message?: string }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="animate-fade-up">
+      <span className="flex size-12 items-center justify-center rounded-xl border border-border bg-card shadow-xs">
+        <MailCheckIcon aria-hidden className="size-5 text-primary" />
+      </span>
+      <h1
+        ref={headingRef}
+        tabIndex={-1}
+        className="mt-6 text-2xl leading-tight font-semibold tracking-tight text-foreground outline-none"
+      >
+        Check your inbox
+      </h1>
+      <p className="mt-2 text-[0.9375rem] leading-relaxed text-pretty text-muted-foreground">
+        {message ?? "We sent you a link to confirm your email address."}
+      </p>
+      <Link
+        href="/auth/sign-in"
+        className={cn(buttonVariants({ variant: "outline", size: "lg" }), "mt-8 w-full")}
+      >
+        Go to sign in
+      </Link>
+      <p className="mt-4 text-center text-sm text-muted-foreground">
+        Can’t find the email? Check your spam folder.
+      </p>
+    </div>
   );
 }

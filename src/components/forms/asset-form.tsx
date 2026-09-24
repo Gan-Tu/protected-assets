@@ -2,32 +2,29 @@
 
 import {
   useActionState,
-  useMemo,
+  useEffect,
+  useRef,
   useState,
   useTransition,
-  type ChangeEvent,
 } from "react";
-import {
-  ClockIcon,
-  GlobeIcon,
-  InfoIcon,
-  Loader2Icon,
-  PlusIcon,
-  ShieldCheckIcon,
-  Trash2Icon,
-  UploadIcon,
-} from "lucide-react";
 
 import {
   createUploadTicketsAction,
   deleteAssetFileAction,
 } from "@/app/dashboard/actions";
 import { StatusMessage } from "@/components/app/status-message";
-import { SubmitButton } from "@/components/app/submit-button";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CurrentFiles } from "@/components/asset-editor/current-files";
+import { DeliveryNote } from "@/components/asset-editor/delivery-note";
+import { EditorCard } from "@/components/asset-editor/editor-card";
+import { FileDropzone } from "@/components/asset-editor/file-dropzone";
+import { FileRow } from "@/components/asset-editor/file-row";
+import { LinkFields } from "@/components/asset-editor/link-fields";
+import { ReleasePolicy } from "@/components/asset-editor/release-policy";
+import { SaveBar } from "@/components/asset-editor/save-bar";
+import { Field, describedBy } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Textarea } from "@/components/ui/textarea";
 import { IDLE_STATE, type ActionState } from "@/lib/action-state";
 import {
@@ -35,10 +32,10 @@ import {
   MAX_FILES_PER_ASSET,
   MAX_UPLOAD_BYTES,
 } from "@/lib/constants";
+import { LIMITS } from "@/lib/limits";
 import type { Asset, AssetFile, AssetGroup, AssetLink } from "@/lib/types";
 import { uploadFileToSignedUrl } from "@/lib/upload-client";
-import { compactFileSize, cn } from "@/lib/utils";
-import { LIMITS } from "@/lib/validation";
+import { cn, compactFileSize, slugify } from "@/lib/utils";
 
 type CollectionMode = "existing" | "new";
 
@@ -53,19 +50,41 @@ type UploadItem = {
   error?: string;
 };
 
-function splitDelay(totalSeconds: number) {
-  return {
-    days: Math.floor(totalSeconds / 86400),
-    hours: Math.floor((totalSeconds % 86400) / 3600),
-    minutes: Math.floor((totalSeconds % 3600) / 60),
-    seconds: totalSeconds % 60,
-  };
-}
+const COLLECTION_OPTIONS = [
+  { value: "existing", label: "Existing" },
+  { value: "new", label: "New" },
+] as const;
+
+const UPLOAD_LIMITS_HINT = `Up to ${compactFileSize(MAX_UPLOAD_BYTES)} each · ${MAX_FILES_PER_ASSET} files per asset`;
+
+// Fixed locale: the counter renders on the server too, and must hydrate identically.
+const countFormat = new Intl.NumberFormat("en-US");
 
 function getInitialLinkInputs(asset?: Asset, links: AssetLink[] = []) {
   if (links.length) return links.map((link) => link.url);
   if (asset?.link_url) return [asset.link_url];
   return [""];
+}
+
+/** `links` (whole list) or `links.N` (Nth non-empty link) from the server. */
+function findLinkError(fieldErrors: Record<string, string>) {
+  if (fieldErrors.links) return { message: fieldErrors.links, index: undefined };
+
+  for (const [key, message] of Object.entries(fieldErrors)) {
+    const match = /^links\.(\d+)$/.exec(key);
+    if (match) return { message, index: Number(match[1]) };
+  }
+
+  return null;
+}
+
+function hostOf(url?: string) {
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
 }
 
 export function AssetForm({
@@ -74,29 +93,44 @@ export function AssetForm({
   asset,
   links = [],
   files = [],
+  shareBaseUrl,
+  cancelHref = "/dashboard",
+  initialState = IDLE_STATE,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   groups: AssetGroup[];
   asset?: Asset;
   links?: AssetLink[];
   files?: AssetFile[];
+  /** Origin of share pages, shown as the slug prefix when it is short. */
+  shareBaseUrl?: string;
+  cancelHref?: string;
+  /** Prefilled result, e.g. to render error states in a fixture. */
+  initialState?: ActionState;
 }) {
-  const [state, formAction] = useActionState(action, IDLE_STATE);
-  const [autoApproveEnabled, setAutoApproveEnabled] = useState(
-    asset?.auto_approve_enabled ?? false,
+  const [state, formAction] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [dirty, setDirty] = useState(false);
+
+  const [name, setName] = useState(asset?.name ?? "");
+  const [slug, setSlug] = useState(asset?.slug ?? "");
+  const [descriptionLength, setDescriptionLength] = useState(
+    asset?.description?.length ?? 0,
   );
   const [collectionMode, setCollectionMode] =
     useState<CollectionMode>("existing");
   const [selectedGroupId, setSelectedGroupId] = useState(asset?.group_id ?? "");
   const [newGroupName, setNewGroupName] = useState("");
-  const [linkInputs, setLinkInputs] = useState<string[]>(
-    getInitialLinkInputs(asset, links),
-  );
+  const [initialLinks] = useState(() => getInitialLinkInputs(asset, links));
+
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [existingFiles, setExistingFiles] = useState(files);
   const [replaceFiles, setReplaceFiles] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [removingFileId, setRemovingFileId] = useState<string | null>(null);
   const [isRemoving, startRemoving] = useTransition();
+  /** One per in-flight upload, so discarding a row also stops its transfer. */
+  const uploadControllers = useRef(new Map<string, AbortController>());
 
   /**
    * A stable id lets the browser upload into this asset's storage prefix before
@@ -107,46 +141,91 @@ export function AssetForm({
     () => asset?.id ?? globalThis.crypto.randomUUID(),
   );
 
-  const delayValues = useMemo(
-    () =>
-      splitDelay(
-        asset?.auto_approve_delay_seconds ?? DEFAULT_AUTO_APPROVE_DELAY_SECONDS,
-      ),
-    [asset?.auto_approve_delay_seconds],
+  const fieldErrors = state.fieldErrors ?? {};
+  const linkError = findLinkError(fieldErrors);
+  // Only errors this form renders inline; anything else lives in the message.
+  const hasInlineErrors = Boolean(
+    fieldErrors.name ||
+      fieldErrors.slug ||
+      linkError ||
+      fieldErrors.autoApproveDays,
   );
 
   const completedUploads = uploads.filter(
     (upload) => upload.status === "done" && upload.storagePath,
   );
-  const isUploading = uploads.some((upload) => upload.status === "uploading");
+  const uploadingCount = uploads.filter(
+    (upload) => upload.status === "uploading",
+  ).length;
   const keptFiles = replaceFiles ? [] : existingFiles;
-  const totalFiles = keptFiles.length + completedUploads.length;
-  const fieldErrors = state.fieldErrors ?? {};
+  // In-flight uploads count toward the cap too: they will all land.
+  const fileCount =
+    keptFiles.length +
+    uploads.filter((upload) => upload.status !== "error").length;
 
-  function updateLink(index: number, value: string) {
-    setLinkInputs((current) =>
-      current.map((link, currentIndex) =>
-        currentIndex === index ? value : link,
-      ),
+  const shareHost = hostOf(shareBaseUrl);
+  const trimmedSlug = slug.trim();
+  const normalizedSlug = slugify(trimmedSlug);
+  // Mirrors the server: `slugify(slug || name)`.
+  const effectiveSlug = slugify(trimmedSlug || name);
+  const slugWillChange = Boolean(asset && effectiveSlug && effectiveSlug !== asset.slug);
+  const slugIsNormalized = Boolean(
+    trimmedSlug && normalizedSlug && normalizedSlug !== trimmedSlug,
+  );
+  const slugHint =
+    slugIsNormalized || slugWillChange ? (
+      <>
+        {slugIsNormalized ? (
+          <>
+            Saved as{" "}
+            <span className="font-medium text-foreground">{normalizedSlug}</span>.
+            {slugWillChange ? " " : null}
+          </>
+        ) : null}
+        {slugWillChange ? (
+          <span className="text-warning">
+            The current link stops working when you save.
+          </span>
+        ) : null}
+      </>
+    ) : (
+      "Leave blank to generate one from the name."
     );
-  }
 
-  function removeLink(index: number) {
-    setLinkInputs((current) =>
-      current.length === 1
-        ? [""]
-        : current.filter((_, currentIndex) => currentIndex !== index),
-    );
-  }
+  const descriptionNearLimit = descriptionLength >= LIMITS.description * 0.9;
 
-  async function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(event.target.files ?? []);
-    event.target.value = "";
+  // After a failed save, take keyboard and screen-reader users to the first
+  // problem instead of leaving them at the button.
+  useEffect(() => {
+    if (state === initialState || state.status !== "error") return;
+
+    const form = formRef.current;
+    const target =
+      form?.querySelector<HTMLElement>('[aria-invalid="true"]') ??
+      form?.querySelector<HTMLElement>("[data-form-error]");
+    if (!target) return;
+
+    target.scrollIntoView({ block: "center" });
+    if (target.matches("input, select, textarea")) {
+      target.focus({ preventScroll: true });
+    }
+  }, [state, initialState]);
+
+  // Leaving the page abandons the form; stop any transfers still running.
+  useEffect(() => {
+    const controllers = uploadControllers.current;
+    return () => {
+      controllers.forEach((controller) => controller.abort());
+      controllers.clear();
+    };
+  }, []);
+
+  async function handleFiles(selected: File[]) {
     setUploadError(null);
 
     if (!selected.length) return;
 
-    if (totalFiles + selected.length > MAX_FILES_PER_ASSET) {
+    if (fileCount + selected.length > MAX_FILES_PER_ASSET) {
       setUploadError(`An asset can hold at most ${MAX_FILES_PER_ASSET} files.`);
       return;
     }
@@ -154,7 +233,7 @@ export function AssetForm({
     const oversized = selected.find((file) => file.size > MAX_UPLOAD_BYTES);
     if (oversized) {
       setUploadError(
-        `"${oversized.name}" exceeds the ${compactFileSize(MAX_UPLOAD_BYTES)} per-file limit.`,
+        `“${oversized.name}” is larger than the ${compactFileSize(MAX_UPLOAD_BYTES)} per-file limit.`,
       );
       return;
     }
@@ -168,6 +247,9 @@ export function AssetForm({
       status: "uploading",
     }));
 
+    for (const item of pending) {
+      uploadControllers.current.set(item.id, new AbortController());
+    }
     setUploads((current) => [...current, ...pending]);
 
     const response = await createUploadTicketsAction({
@@ -189,6 +271,7 @@ export function AssetForm({
             : upload,
         ),
       );
+      for (const item of pending) uploadControllers.current.delete(item.id);
       return;
     }
 
@@ -197,11 +280,16 @@ export function AssetForm({
       response.tickets.map(async (ticket, index) => {
         const item = pending[index];
         const file = selected[index];
+        const controller = uploadControllers.current.get(item.id);
+
+        // Discarded while the tickets were being minted.
+        if (!controller || controller.signal.aborted) return;
 
         try {
           await uploadFileToSignedUrl({
             signedUrl: ticket.signedUrl,
             file,
+            signal: controller.signal,
             onProgress: (fraction) =>
               setUploads((current) =>
                 current.map((upload) =>
@@ -225,6 +313,9 @@ export function AssetForm({
             ),
           );
         } catch (error) {
+          // The row was discarded on purpose; nothing to report.
+          if (controller.signal.aborted) return;
+
           const message =
             error instanceof Error ? error.message : "Upload failed.";
           setUploadError(message);
@@ -235,18 +326,23 @@ export function AssetForm({
                 : upload,
             ),
           );
+        } finally {
+          uploadControllers.current.delete(item.id);
         }
       }),
     );
   }
 
   function discardUpload(id: string) {
+    uploadControllers.current.get(id)?.abort();
+    uploadControllers.current.delete(id);
     setUploads((current) => current.filter((upload) => upload.id !== id));
   }
 
   function removeExistingFile(fileId: string) {
     if (!asset) return;
 
+    setRemovingFileId(fileId);
     startRemoving(async () => {
       const result = await deleteAssetFileAction({
         assetId: asset.id,
@@ -255,17 +351,28 @@ export function AssetForm({
 
       if (result.status === "error") {
         setUploadError(result.message ?? "Unable to remove that file.");
-        return;
+      } else {
+        setExistingFiles((current) =>
+          current.filter((file) => file.id !== fileId),
+        );
       }
 
-      setExistingFiles((current) =>
-        current.filter((file) => file.id !== fileId),
-      );
+      setRemovingFileId(null);
     });
   }
 
+  const markDirty = () => setDirty(true);
+
   return (
-    <form action={formAction} className="grid gap-8 lg:grid-cols-[1fr_320px]">
+    <form
+      ref={formRef}
+      action={formAction}
+      // React 19 resets a form after every action, failed ones included, which
+      // would wipe what the owner typed (and desync the auto-release switch
+      // from its state). A successful save redirects and remounts anyway.
+      onReset={(event) => event.preventDefault()}
+      onInput={markDirty}
+    >
       {asset ? (
         <input type="hidden" name="asset_id" value={asset.id} />
       ) : (
@@ -289,216 +396,213 @@ export function AssetForm({
         value={replaceFiles ? "true" : "false"}
       />
 
-      <div className="space-y-8">
-        <section className="space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold text-zinc-900">
-              {asset ? "Edit asset" : "New asset"}
-            </h2>
-            <p className="text-sm text-zinc-500">
-              Configure your protected asset and release policy.
-            </p>
-          </div>
-
-          <div className="grid gap-6">
-            <div className="grid gap-2">
-              <Label htmlFor="name" className="text-zinc-700">
-                Name
-              </Label>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid min-w-0 gap-6">
+          <EditorCard
+            title="Details"
+            description="The name, link and description requesters see."
+          >
+            <Field id="name" label="Name" error={fieldErrors.name}>
               <Input
                 id="name"
                 name="name"
-                defaultValue={asset?.name}
-                placeholder="e.g. Q1 Investor Deck"
-                className="bg-white"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. Q1 investor deck"
                 maxLength={LIMITS.name}
-                aria-invalid={Boolean(fieldErrors.name)}
-                aria-describedby={fieldErrors.name ? "name-error" : undefined}
+                autoComplete="off"
                 required
+                aria-invalid={Boolean(fieldErrors.name) || undefined}
+                aria-describedby={describedBy("name", { error: fieldErrors.name })}
               />
-              {fieldErrors.name ? (
-                <p id="name-error" className="text-xs text-red-600">
-                  {fieldErrors.name}
-                </p>
-              ) : null}
-            </div>
+            </Field>
 
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="slug" className="text-zinc-700">
-                  URL slug
-                </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
-                    /a/
-                  </span>
-                  <Input
-                    id="slug"
-                    name="slug"
-                    defaultValue={asset?.slug}
-                    placeholder="slug"
-                    className="bg-white pl-8"
-                    maxLength={LIMITS.slug}
-                    aria-invalid={Boolean(fieldErrors.slug)}
-                    aria-describedby={fieldErrors.slug ? "slug-error" : undefined}
-                  />
-                </div>
-                {fieldErrors.slug ? (
-                  <p id="slug-error" className="text-xs text-red-600">
-                    {fieldErrors.slug}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="group_id" className="text-zinc-700">
-                    Collection
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="cursor-pointer px-2 text-xs font-semibold text-zinc-600 hover:text-zinc-900"
-                    onClick={() =>
-                      setCollectionMode((current) =>
-                        current === "new" ? "existing" : "new",
-                      )
-                    }
-                  >
-                    {collectionMode === "new" ? "Use existing" : "Create new"}
-                  </Button>
-                </div>
-
-                {collectionMode === "new" ? (
-                  <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
-                    <input type="hidden" name="group_id" value="" />
-                    <Input
-                      id="new_group_name"
-                      name="new_group_name"
-                      value={newGroupName}
-                      onChange={(event) => setNewGroupName(event.target.value)}
-                      placeholder="e.g. Investor Updates"
-                      className="bg-white"
-                      maxLength={LIMITS.name}
-                      required
-                    />
-                    <p className="text-xs text-zinc-500">
-                      A new collection is created when you save this asset.
-                    </p>
-                  </div>
-                ) : (
-                  <select
-                    id="group_id"
-                    name="group_id"
-                    value={selectedGroupId}
-                    onChange={(event) => setSelectedGroupId(event.target.value)}
-                    className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:ring-1 focus:ring-zinc-400"
-                  >
-                    <option value="">No collection</option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
+            <Field
+              id="slug"
+              label="Share link"
+              hint={slugHint}
+              error={fieldErrors.slug}
+            >
+              {/* One control visually: the ring wraps prefix and input together. */}
+              <div
+                className={cn(
+                  "flex h-10 w-full min-w-0 overflow-hidden rounded-lg border border-input bg-card shadow-xs transition-[border-color,box-shadow] duration-150 ease-out-soft",
+                  "hover:border-input-hover has-[input:focus-visible]:border-primary has-[input:focus-visible]:ring-4 has-[input:focus-visible]:ring-primary/15",
+                  fieldErrors.slug &&
+                    "border-danger ring-4 ring-danger/12 hover:border-danger has-[input:focus-visible]:border-danger has-[input:focus-visible]:ring-danger/12",
                 )}
+              >
+                <span
+                  id="slug-prefix"
+                  className="flex max-w-[55%] shrink-0 items-center border-r border-border bg-surface-subtle pr-2.5 pl-3 text-base text-muted-foreground select-none md:text-sm"
+                >
+                  {shareHost && shareHost.length <= 28 ? (
+                    <span className="hidden truncate sm:inline">{shareHost}</span>
+                  ) : null}
+                  <span className="shrink-0">/a/</span>
+                </span>
+                <input
+                  id="slug"
+                  name="slug"
+                  value={slug}
+                  onChange={(event) => setSlug(event.target.value)}
+                  placeholder={slugify(name) || "q1-investor-deck"}
+                  maxLength={LIMITS.slug}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  aria-invalid={Boolean(fieldErrors.slug) || undefined}
+                  aria-describedby={[
+                    "slug-prefix",
+                    describedBy("slug", { hint: slugHint, error: fieldErrors.slug }),
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-foreground outline-none placeholder:text-placeholder md:text-sm"
+                />
               </div>
-            </div>
+            </Field>
 
-            <div className="grid gap-2">
-              <Label htmlFor="description" className="text-zinc-700">
-                Description
-              </Label>
+            <Field
+              id={collectionMode === "new" ? "new_group_name" : "group_id"}
+              label="Collection"
+              hint={
+                collectionMode === "new"
+                  ? "Created when you save."
+                  : "Groups related assets on your overview."
+              }
+              action={
+                <SegmentedControl
+                  name="collection_mode"
+                  size="sm"
+                  aria-label="Existing or new collection"
+                  value={collectionMode}
+                  onValueChange={setCollectionMode}
+                  options={COLLECTION_OPTIONS}
+                />
+              }
+            >
+              {collectionMode === "new" ? (
+                <>
+                  <input type="hidden" name="group_id" value="" />
+                  <Input
+                    id="new_group_name"
+                    name="new_group_name"
+                    value={newGroupName}
+                    onChange={(event) => setNewGroupName(event.target.value)}
+                    placeholder="e.g. Investor updates"
+                    maxLength={LIMITS.name}
+                    autoComplete="off"
+                    required
+                    aria-describedby="new_group_name-hint"
+                  />
+                </>
+              ) : (
+                <NativeSelect
+                  id="group_id"
+                  name="group_id"
+                  value={selectedGroupId}
+                  onChange={(event) => setSelectedGroupId(event.target.value)}
+                  aria-describedby="group_id-hint"
+                >
+                  <option value="">No collection</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              )}
+            </Field>
+
+            <Field
+              id="description"
+              label="Description"
+              optional
+              hint={
+                <span className="flex items-baseline justify-between gap-3">
+                  <span>Shown on the share page.</span>
+                  <span
+                    className={cn(
+                      "shrink-0 tabular",
+                      descriptionNearLimit && "font-medium text-warning",
+                    )}
+                  >
+                    {countFormat.format(descriptionLength)} /{" "}
+                    {countFormat.format(LIMITS.description)}
+                  </span>
+                </span>
+              }
+            >
               <Textarea
                 id="description"
                 name="description"
                 defaultValue={asset?.description ?? ""}
-                placeholder="What is this asset for?"
+                onChange={(event) =>
+                  setDescriptionLength(event.target.value.length)
+                }
+                placeholder="What’s inside, and who it’s for"
                 rows={3}
                 maxLength={LIMITS.description}
-                className="resize-none bg-white"
+                aria-describedby="description-hint"
+                className="max-h-72 resize-none"
               />
-            </div>
-          </div>
-        </section>
+            </Field>
+          </EditorCard>
 
-        <section className="space-y-6">
-          <div className="space-y-2">
-            <Label className="text-zinc-700">Protected links</Label>
-            <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/50 p-6">
-              <div className="space-y-1">
-                <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
-                  <GlobeIcon className="size-3.5 text-zinc-500" aria-hidden />
-                  Link access
-                </p>
-                <p className="text-xs text-zinc-500">
-                  Add as many destination URLs as you want. These are delivered
-                  alongside any uploaded files.
-                </p>
+          <EditorCard
+            title="Content"
+            description="What requesters receive once access is granted."
+          >
+            <LinkFields
+              initialLinks={initialLinks}
+              error={linkError?.message}
+              invalidEntry={linkError?.index}
+              onEdit={markDirty}
+            />
+
+            <section
+              aria-labelledby="files-heading"
+              className="grid gap-3 border-t border-border pt-6"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="grid gap-0.5">
+                  <h3
+                    id="files-heading"
+                    className="text-sm leading-5 font-medium text-foreground"
+                  >
+                    Files
+                  </h3>
+                  <p className="text-[0.8125rem] leading-5 text-pretty text-muted-foreground">
+                    Uploaded straight to private storage as you add them.
+                  </p>
+                </div>
+                {fileCount ? (
+                  <span className="shrink-0 text-[0.8125rem] text-muted-foreground tabular">
+                    {fileCount} of {MAX_FILES_PER_ASSET}
+                  </span>
+                ) : null}
               </div>
 
-              <div className="space-y-3">
-                {linkInputs.map((link, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <Input
-                      name="link_url"
-                      value={link}
-                      onChange={(event) => updateLink(index, event.target.value)}
-                      placeholder="https://..."
-                      type="url"
-                      maxLength={LIMITS.url}
-                      className="bg-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeLink(index)}
-                      className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900"
-                      aria-label={`Remove link ${index + 1}`}
-                    >
-                      <Trash2Icon className="size-4" aria-hidden />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {fieldErrors.links ? (
-                <p className="text-xs text-red-600">{fieldErrors.links}</p>
+              {/* What's there first, then the way to add more; new rows land right under the zone. */}
+              {existingFiles.length ? (
+                <CurrentFiles
+                  files={existingFiles}
+                  replaceFiles={replaceFiles}
+                  onReplaceFilesChange={setReplaceFiles}
+                  onRemove={removeExistingFile}
+                  removingId={removingFileId}
+                  busy={isRemoving}
+                />
               ) : null}
 
-              <button
-                type="button"
-                onClick={() => setLinkInputs((current) => [...current, ""])}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
-              >
-                <PlusIcon className="size-4" aria-hidden />
-                Add another link
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="files" className="text-zinc-700">
-              Protected files
-            </Label>
-            <div className="space-y-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 p-6">
-              <div className="space-y-1">
-                <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
-                  <UploadIcon className="size-3.5 text-zinc-500" aria-hidden />
-                  Document bundle
-                </p>
-                <p className="text-xs text-zinc-500">
-                  Files upload straight to secure storage as you pick them, up to{" "}
-                  {compactFileSize(MAX_UPLOAD_BYTES)} each.
-                </p>
-              </div>
-
-              <Input
+              <FileDropzone
                 id="files"
-                type="file"
-                multiple
-                onChange={handleFileSelection}
-                className="cursor-pointer bg-white"
+                onFiles={handleFiles}
+                onReject={setUploadError}
+                hint={UPLOAD_LIMITS_HINT}
+                disabled={fileCount >= MAX_FILES_PER_ASSET}
+                disabledMessage={`This asset has the maximum of ${MAX_FILES_PER_ASSET} files`}
               />
 
               {uploadError ? (
@@ -506,254 +610,67 @@ export function AssetForm({
               ) : null}
 
               {uploads.length ? (
-                <ul className="grid gap-1.5">
+                <ul
+                  aria-label="New files"
+                  className="divide-y divide-border overflow-hidden rounded-xl border border-border"
+                >
                   {uploads.map((upload) => (
-                    <li
+                    <FileRow
                       key={upload.id}
-                      className="rounded-md border border-zinc-100 bg-white p-2.5 text-sm"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-zinc-700">
-                            {upload.fileName}
-                          </p>
-                          <p className="text-xs text-zinc-500">
-                            {compactFileSize(upload.fileSize)}
-                            {upload.status === "uploading" &&
-                              ` - ${Math.round(upload.progress * 100)}%`}
-                            {upload.status === "done" && " - uploaded"}
-                            {upload.status === "error" &&
-                              ` - ${upload.error ?? "failed"}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {upload.status === "uploading" ? (
-                            <Loader2Icon
-                              className="size-4 animate-spin text-zinc-400"
-                              aria-hidden
-                            />
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => discardUpload(upload.id)}
-                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900"
-                            aria-label={`Remove ${upload.fileName}`}
-                          >
-                            <Trash2Icon className="size-4" aria-hidden />
-                          </button>
-                        </div>
-                      </div>
-                      {upload.status === "uploading" ? (
-                        <div
-                          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-100"
-                          role="progressbar"
-                          aria-valuenow={Math.round(upload.progress * 100)}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-label={`Uploading ${upload.fileName}`}
-                        >
-                          <div
-                            className="h-full bg-zinc-900 transition-all"
-                            style={{ width: `${upload.progress * 100}%` }}
-                          />
-                        </div>
-                      ) : null}
-                    </li>
+                      name={upload.fileName}
+                      size={upload.fileSize}
+                      contentType={upload.contentType}
+                      status={upload.status}
+                      progress={upload.progress}
+                      error={upload.error}
+                      onRemove={() => discardUpload(upload.id)}
+                      removeLabel={
+                        upload.status === "uploading"
+                          ? `Cancel upload of ${upload.fileName}`
+                          : `Remove ${upload.fileName}`
+                      }
+                    />
                   ))}
                 </ul>
               ) : null}
+            </section>
+          </EditorCard>
+        </div>
 
-              {existingFiles.length ? (
-                <div className="space-y-3 border-t border-zinc-200 pt-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                      Current files
-                    </p>
-                    <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-600">
-                      <input
-                        type="checkbox"
-                        checked={replaceFiles}
-                        onChange={(event) =>
-                          setReplaceFiles(event.target.checked)
-                        }
-                        className="rounded border-zinc-300"
-                      />
-                      Delete all current files on save
-                    </label>
-                  </div>
-
-                  {replaceFiles ? (
-                    <StatusMessage status="error">
-                      Saving will permanently delete the {existingFiles.length}{" "}
-                      file{existingFiles.length === 1 ? "" : "s"} below.
-                    </StatusMessage>
-                  ) : null}
-
-                  <ul className="grid gap-1.5">
-                    {existingFiles.map((file) => (
-                      <li
-                        key={file.id}
-                        className={cn(
-                          "flex items-center justify-between gap-3 rounded-md border border-zinc-100 bg-white p-2.5 text-sm",
-                          replaceFiles && "opacity-50",
-                        )}
-                      >
-                        <span className="truncate text-zinc-700">
-                          {file.file_name}
-                        </span>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className="text-xs text-zinc-500">
-                            {compactFileSize(file.file_size)}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={isRemoving || replaceFiles}
-                            onClick={() => removeExistingFile(file.id)}
-                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                            aria-label={`Delete ${file.file_name}`}
-                          >
-                            <Trash2Icon className="size-4" aria-hidden />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        {state.status === "error" && state.message ? (
-          <StatusMessage status="error">{state.message}</StatusMessage>
-        ) : null}
-
-        <div className="border-t border-zinc-100 pt-6">
-          <SubmitButton
-            className="w-full sm:w-auto"
-            pendingLabel="Saving..."
-            disabled={isUploading}
-          >
-            {asset ? "Save changes" : "Create asset"}
-          </SubmitButton>
-          {isUploading ? (
-            <p className="mt-2 text-xs text-zinc-500">
-              Waiting for uploads to finish...
-            </p>
-          ) : null}
+        <div className="grid min-w-0 gap-6 lg:sticky lg:top-20">
+          <ReleasePolicy
+            defaultEnabled={asset?.auto_approve_enabled ?? false}
+            defaultDelaySeconds={
+              asset?.auto_approve_delay_seconds ??
+              DEFAULT_AUTO_APPROVE_DELAY_SECONDS
+            }
+            defaultNote={asset?.auto_approve_note ?? ""}
+            error={fieldErrors.autoApproveDays}
+            onEdit={markDirty}
+          />
+          <DeliveryNote />
         </div>
       </div>
 
-      <aside className="space-y-6">
-        <Card className="overflow-hidden border-zinc-200 shadow-sm">
-          <CardHeader className="bg-zinc-50/50 pb-4">
-            <CardTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-zinc-600">
-              <ClockIcon className="size-3.5" aria-hidden />
-              Auto-release
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-4">
-            <label className="group flex cursor-pointer items-start gap-3">
-              <input
-                type="checkbox"
-                name="auto_approve_enabled"
-                defaultChecked={asset?.auto_approve_enabled ?? false}
-                className="mt-1 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
-                onChange={(event) => setAutoApproveEnabled(event.target.checked)}
-              />
-              <div className="space-y-1">
-                <span className="text-sm font-medium text-zinc-900">
-                  Enabled
-                </span>
-                <p className="text-xs leading-relaxed text-zinc-500">
-                  Automatically release if no action is taken. Maximum 7 days.
-                </p>
-              </div>
-            </label>
-
-            <div
-              className={cn(
-                "grid grid-cols-2 gap-3 transition-opacity",
-                !autoApproveEnabled && "pointer-events-none opacity-40",
-              )}
-            >
-              {(
-                [
-                  ["auto_approve_days", "Days", delayValues.days, 365],
-                  ["auto_approve_hours", "Hours", delayValues.hours, 23],
-                  ["auto_approve_minutes", "Min", delayValues.minutes, 59],
-                  ["auto_approve_seconds", "Sec", delayValues.seconds, 59],
-                ] as const
-              ).map(([name, label, value, max]) => (
-                <div key={name} className="space-y-1.5">
-                  <Label
-                    htmlFor={name}
-                    className="text-[10px] font-bold uppercase text-zinc-500"
-                  >
-                    {label}
-                  </Label>
-                  <Input
-                    id={name}
-                    name={name}
-                    type="number"
-                    min="0"
-                    max={max}
-                    defaultValue={value}
-                    disabled={!autoApproveEnabled}
-                    className="h-8 text-sm"
-                  />
-                </div>
-              ))}
-            </div>
-
-            {fieldErrors.autoApproveDays ? (
-              <p className="text-xs text-red-600">
-                {fieldErrors.autoApproveDays}
-              </p>
-            ) : null}
-
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="release_note"
-                className="text-[10px] font-bold uppercase text-zinc-500"
-              >
-                Release note
-              </Label>
-              <Textarea
-                id="release_note"
-                name="release_note"
-                defaultValue={asset?.auto_approve_note ?? ""}
-                placeholder="Optional note to include on every approval and auto-release."
-                rows={4}
-                maxLength={LIMITS.note}
-                className="resize-none bg-white text-sm"
-              />
-              <p className="text-xs leading-relaxed text-zinc-500">
-                Always attached when access is granted. Manual approvals can add
-                a separate one-off note.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-          <div className="flex items-center gap-2 text-zinc-900">
-            <ShieldCheckIcon className="size-4 text-zinc-500" aria-hidden />
-            <span className="text-sm font-semibold">How delivery works</span>
-          </div>
-          <p className="text-xs leading-relaxed text-zinc-600">
-            Small documents are attached directly to the release email. Anything
-            larger is sent as a revocable download link that expires, and stops
-            working if you clear the request.
-          </p>
-          <div className="flex items-center gap-2 text-zinc-500">
-            <InfoIcon className="size-3" aria-hidden />
-            <span className="text-[10px] font-medium uppercase tracking-tighter">
-              Owner control plane
-            </span>
-          </div>
+      {state.status === "error" && state.message ? (
+        <div data-form-error className="mt-6">
+          <StatusMessage status="error">{state.message}</StatusMessage>
         </div>
-      </aside>
+      ) : null}
+
+      <SaveBar
+        mode={asset ? "edit" : "new"}
+        cancelHref={cancelHref}
+        uploadingCount={uploadingCount}
+        error={
+          state.status === "error"
+            ? hasInlineErrors
+              ? "fields"
+              : "form"
+            : null
+        }
+        dirty={dirty || uploads.length > 0}
+      />
     </form>
   );
 }

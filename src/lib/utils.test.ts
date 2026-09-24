@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   compactFileSize,
+  formatCountdown,
+  formatRelativeTime,
   formatRelativeWindow,
+  formatShortUtcDate,
+  getInitials,
+  hashToIndex,
   getAutoReleaseTargetIso,
   isLocalUrl,
   slugify,
@@ -77,5 +82,63 @@ describe("isLocalUrl", () => {
     expect(isLocalUrl("http://localhost:3000")).toBe(true);
     expect(isLocalUrl("http://127.0.0.1:3000")).toBe(true);
     expect(isLocalUrl("https://protected.example.com")).toBe(false);
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const now = Date.parse("2026-06-15T12:00:00.000Z");
+  const ago = (seconds: number) => new Date(now - seconds * 1000).toISOString();
+
+  it("buckets recent times compactly", () => {
+    expect(formatRelativeTime(ago(10), now)).toBe("Just now");
+    expect(formatRelativeTime(ago(60 * 5), now)).toBe("5m ago");
+    expect(formatRelativeTime(ago(3600 * 3), now)).toBe("3h ago");
+    expect(formatRelativeTime(ago(86400 + 60), now)).toBe("Yesterday");
+    expect(formatRelativeTime(ago(86400 * 4), now)).toBe("4d ago");
+  });
+
+  it("falls back to a date for older values and survives bad input", () => {
+    expect(formatRelativeTime(ago(86400 * 30), now)).not.toMatch(/ago/);
+    expect(formatRelativeTime("not a date", now)).toBe("Unknown");
+  });
+});
+
+describe("getInitials", () => {
+  it("prefers the name and falls back to the email", () => {
+    expect(getInitials("Ada Lovelace", "ada@example.com")).toBe("AL");
+    expect(getInitials("  ", "grace.hopper@example.com")).toBe("GH");
+    expect(getInitials(null, "zed@example.com")).toBe("ZE");
+    expect(getInitials("Jean-Luc Picard", "x@example.com")).toBe("JP");
+  });
+});
+
+describe("hashToIndex", () => {
+  it("is stable and in range", () => {
+    const first = hashToIndex("ada@example.com", 7);
+    expect(first).toBe(hashToIndex("ada@example.com", 7));
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThan(7);
+  });
+});
+
+describe("formatShortUtcDate", () => {
+  it("is a compact, timezone-independent date", () => {
+    expect(formatShortUtcDate("2026-09-24T23:30:00.000Z")).toBe("Sep 24");
+    expect(formatShortUtcDate("nope")).toBe("Unknown");
+  });
+});
+
+describe("formatCountdown", () => {
+  it("keeps the two most significant units", () => {
+    expect(formatCountdown(6 * 86400 + 23 * 3600 + 59 * 60 + 53)).toBe("6d 23h");
+    expect(formatCountdown(3 * 3600 + 62)).toBe("3h 1m");
+    expect(formatCountdown(4 * 60 + 12)).toBe("4m 12s");
+    expect(formatCountdown(9)).toBe("9s");
+  });
+
+  it("drops empty trailing units and clamps negatives", () => {
+    expect(formatCountdown(2 * 86400)).toBe("2d");
+    expect(formatCountdown(3600)).toBe("1h");
+    expect(formatCountdown(-4)).toBe("0s");
   });
 });

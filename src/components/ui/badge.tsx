@@ -4,40 +4,61 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
+/**
+ * Sentence-case pills. Every tone pairs a tinted background with a foreground
+ * that clears 4.8:1 on it, so status text is legible at 12px.
+ */
+const badgeVariantStyles = cva(
+  "group/badge inline-flex h-[22px] w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 text-xs leading-none font-medium whitespace-nowrap tabular [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        secondary:
-          "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
-        destructive:
-          "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
-        outline:
-          "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
-        ghost:
-          "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
-        link: "text-primary underline-offset-4 hover:underline",
+        neutral: "bg-[#efeff2] text-[#48484d]",
+        accent: "bg-primary-subtle text-primary-subtle-foreground",
+        success: "bg-success-subtle text-success",
+        warning: "bg-warning-subtle text-warning",
+        danger: "bg-danger-subtle text-danger",
+        info: "bg-info-subtle text-info",
+        outline: "border-border bg-card text-muted-foreground",
+        solid: "bg-foreground text-background",
+      },
+      dot: {
+        true: "before:size-1.5 before:shrink-0 before:rounded-full before:bg-current before:content-['']",
+        false: "",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "neutral",
+      dot: false,
     },
   }
 )
 
+/** Merged like buttonVariants, so tone overrides beat base classes anywhere. */
+function badgeVariants({
+  variant,
+  dot,
+  className,
+}: VariantProps<typeof badgeVariantStyles> & { className?: string } = {}) {
+  return cn(badgeVariantStyles({ variant, dot }), className)
+}
+
 function Badge({
   className,
-  variant = "default",
+  variant = "neutral",
+  dot = false,
   render,
   ...props
-}: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
+}: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariantStyles>) {
   return useRender({
     defaultTagName: "span",
     props: mergeProps<"span">(
       {
-        className: cn(badgeVariants({ variant }), className),
+        className: badgeVariants({
+          variant,
+          dot,
+          className: typeof className === "string" ? className : undefined,
+        }),
       },
       props
     ),

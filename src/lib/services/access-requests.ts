@@ -96,8 +96,9 @@ export async function submitAccessRequest(
     throw new NotFoundError("That protected asset could not be found.");
   }
 
+  // Shown to the requester, so spelled out ("2 days", not "2d").
   const autoApproveLabel = asset.auto_approve_enabled
-    ? formatRelativeWindow(asset.auto_approve_delay_seconds)
+    ? formatRelativeWindow(asset.auto_approve_delay_seconds, { verbose: true })
     : null;
 
   // Re-submitting the same form must not create a second row, a second owner

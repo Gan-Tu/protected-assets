@@ -1,142 +1,114 @@
 "use client";
 
-import { useActionState } from "react";
-import { CheckCircle2Icon } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
 
 import type { RequestFormState } from "@/app/a/[slug]/actions";
-import { StatusMessage } from "@/components/app/status-message";
-import { SubmitButton } from "@/components/app/submit-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  REQUEST_ACCESS_TITLE_ID,
+  RequestAccessBody,
+  RequestAccessCard,
+  RequestAccessHeader,
+} from "@/components/share/request-access-card";
+import {
+  REQUEST_FIELD_IDS,
+  RequestAccessFields,
+  type RequestDraft,
+  type RequestLimits,
+} from "@/components/share/request-access-fields";
+import { RequestAccessSuccess } from "@/components/share/request-access-success";
 import { IDLE_STATE } from "@/lib/action-state";
-import { LIMITS } from "@/lib/validation";
 
+const FIELD_KEYS = Object.keys(REQUEST_FIELD_IDS) as Array<
+  keyof typeof REQUEST_FIELD_IDS
+>;
+
+function readDraft(form: HTMLFormElement): RequestDraft {
+  const data = new FormData(form);
+  const read = (key: string) => {
+    const value = data.get(key);
+    return typeof value === "string" ? value : "";
+  };
+
+  return {
+    name: read("requester_name"),
+    email: read("requester_email"),
+    reason: read("reason"),
+  };
+}
+
+/**
+ * The server action is passed straight to `useActionState`, so the form still
+ * posts (and renders the result) before hydration.
+ *
+ * React resets a form after every action, failed ones included. The draft
+ * captured on submit becomes the fields' default values, so the reset restores
+ * what the requester typed instead of wiping it.
+ */
 export function RequestAccessForm({
   slug,
   action,
+  limits,
+  className,
 }: {
   slug: string;
   action: (
     state: RequestFormState,
     formData: FormData,
   ) => Promise<RequestFormState>;
+  limits: RequestLimits;
+  className?: string;
 }) {
   const [state, formAction] = useActionState(action, IDLE_STATE);
+  const [draft, setDraft] = useState<RequestDraft | null>(null);
   const fieldErrors = state.fieldErrors ?? {};
+
+  // Like native validation: take the requester to the first field to fix. Its
+  // error is read out through `aria-describedby`.
+  useEffect(() => {
+    if (state.status !== "error") return;
+
+    const firstInvalid = FIELD_KEYS.find((key) => state.fieldErrors?.[key]);
+    if (firstInvalid) {
+      document.getElementById(REQUEST_FIELD_IDS[firstInvalid])?.focus();
+    }
+  }, [state]);
 
   if (state.status === "success") {
     return (
-      <div className="space-y-4 py-8 text-center" role="status" aria-live="polite">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-          <CheckCircle2Icon className="size-6" aria-hidden />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-bold text-zinc-900">Request submitted</h3>
-          <p className="mx-auto max-w-sm text-sm leading-relaxed text-zinc-600">
-            {state.message} You will receive an email when your request is
-            granted or denied.
-          </p>
-          <p className="mx-auto max-w-sm text-xs leading-relaxed text-zinc-500">
-            If you do not see it, check your spam folder.
-          </p>
-        </div>
-      </div>
+      <RequestAccessCard className={className}>
+        <RequestAccessSuccess message={state.message} />
+      </RequestAccessCard>
     );
   }
 
+  // Field errors render inline; only show the banner for anything else
+  // (rate limits, delivery failures) so the same sentence never appears twice.
+  const inlineErrors = FIELD_KEYS.map((key) => fieldErrors[key]);
+  const formError =
+    state.status === "error" &&
+    state.message &&
+    !inlineErrors.includes(state.message)
+      ? state.message
+      : undefined;
+
   return (
-    <form action={formAction} className="space-y-5">
-      <input type="hidden" name="slug" value={slug} />
-
-      <div className="grid gap-2">
-        <Label
-          htmlFor="requester_name"
-          className="text-sm font-medium text-zinc-700"
+    <RequestAccessCard className={className}>
+      <RequestAccessHeader />
+      <RequestAccessBody>
+        <form
+          action={formAction}
+          onSubmit={(event) => setDraft(readDraft(event.currentTarget))}
+          aria-labelledby={REQUEST_ACCESS_TITLE_ID}
         >
-          Name
-        </Label>
-        <Input
-          id="requester_name"
-          name="requester_name"
-          type="text"
-          autoComplete="name"
-          placeholder="Your name"
-          className="bg-zinc-50/50"
-          maxLength={LIMITS.name}
-          aria-invalid={Boolean(fieldErrors.requesterName)}
-          aria-describedby={
-            fieldErrors.requesterName ? "requester-name-error" : undefined
-          }
-          required
-        />
-        {fieldErrors.requesterName ? (
-          <p id="requester-name-error" className="text-xs text-red-600">
-            {fieldErrors.requesterName}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="grid gap-2">
-        <Label
-          htmlFor="requester_email"
-          className="text-sm font-medium text-zinc-700"
-        >
-          Email
-        </Label>
-        <Input
-          id="requester_email"
-          name="requester_email"
-          type="email"
-          autoComplete="email"
-          placeholder="name@example.com"
-          className="bg-zinc-50/50"
-          maxLength={LIMITS.email}
-          aria-invalid={Boolean(fieldErrors.requesterEmail)}
-          aria-describedby={
-            fieldErrors.requesterEmail ? "requester-email-error" : undefined
-          }
-          required
-        />
-        {fieldErrors.requesterEmail ? (
-          <p id="requester-email-error" className="text-xs text-red-600">
-            {fieldErrors.requesterEmail}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="reason" className="text-sm font-medium text-zinc-700">
-          Reason
-        </Label>
-        <Textarea
-          id="reason"
-          name="reason"
-          rows={4}
-          placeholder="Why do you need access?"
-          className="resize-none bg-zinc-50/50"
-          maxLength={LIMITS.reason}
-          aria-invalid={Boolean(fieldErrors.reason)}
-          aria-describedby={fieldErrors.reason ? "reason-error" : undefined}
-          required
-        />
-        {fieldErrors.reason ? (
-          <p id="reason-error" className="text-xs text-red-600">
-            {fieldErrors.reason}
-          </p>
-        ) : null}
-      </div>
-
-      {state.status === "error" && state.message ? (
-        <StatusMessage status="error">{state.message}</StatusMessage>
-      ) : null}
-
-      <SubmitButton
-        className="h-10 w-full font-semibold shadow-sm"
-        pendingLabel="Submitting..."
-      >
-        Request access
-      </SubmitButton>
-    </form>
+          <input type="hidden" name="slug" value={slug} />
+          <RequestAccessFields
+            limits={limits}
+            fieldErrors={fieldErrors}
+            formError={formError}
+            draft={draft}
+          />
+        </form>
+      </RequestAccessBody>
+    </RequestAccessCard>
   );
 }

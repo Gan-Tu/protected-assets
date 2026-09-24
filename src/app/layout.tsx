@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
@@ -13,15 +13,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Icons come from the file conventions in this folder (icon.svg,
+// apple-icon.png, favicon.ico). They used to point at the 308 KB logo.png.
 export const metadata: Metadata = {
   title: "Protected Assets",
   description:
     "A clean release-control workflow for protected links and document bundles.",
-  icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
-  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+  colorScheme: "light",
 };
 
 export default function RootLayout({

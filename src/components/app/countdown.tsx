@@ -1,16 +1,9 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
-import { formatRelativeWindow } from "@/lib/utils";
-
-/** Ticks once a second; unsubscribes with the component. */
-function subscribe(onChange: () => void) {
-  const interval = setInterval(onChange, 1000);
-  return () => clearInterval(interval);
-}
-
-const getNowSeconds = () => Math.floor(Date.now() / 1000);
+import { subscribeToClock } from "@/components/app/clock";
+import { formatCountdown } from "@/lib/utils";
 
 /**
  * Live countdown to an auto-release. Auto-release is the product's headline
@@ -28,26 +21,19 @@ export function Countdown({
   className?: string;
   expiredLabel?: string;
 }) {
-  const nowSeconds = useSyncExternalStore(
-    subscribe,
-    getNowSeconds,
-    () => null,
-  );
+  const getSnapshot = useCallback(() => {
+    const target = Date.parse(targetIso);
+    if (Number.isNaN(target)) return null;
 
-  if (nowSeconds === null) {
-    return <span className={className}>&hellip;</span>;
-  }
+    const remaining = Math.max(0, Math.floor((target - Date.now()) / 1000));
+    return remaining <= 0 ? expiredLabel : formatCountdown(remaining);
+  }, [targetIso, expiredLabel]);
 
-  const target = Date.parse(targetIso);
-  if (Number.isNaN(target)) {
-    return <span className={className}>&hellip;</span>;
-  }
-
-  const remaining = Math.max(0, Math.floor(target / 1000) - nowSeconds);
+  const label = useSyncExternalStore(subscribeToClock, getSnapshot, () => null);
 
   return (
     <span className={className}>
-      {remaining <= 0 ? expiredLabel : formatRelativeWindow(remaining)}
+      {label ?? "…"}
     </span>
   );
 }

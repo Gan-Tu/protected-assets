@@ -2,33 +2,25 @@
 
 import { useFormStatus } from "react-dom";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  Button,
+  type ButtonSize,
+  type ButtonVariant,
+} from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
-type ButtonVariant =
-  | "default"
-  | "outline"
-  | "secondary"
-  | "ghost"
-  | "destructive"
-  | "link";
-type ButtonSize =
-  | "default"
-  | "xs"
-  | "sm"
-  | "lg"
-  | "icon"
-  | "icon-xs"
-  | "icon-sm"
-  | "icon-lg";
-
+/**
+ * Feedback is immediate: the spinner appears on the same frame as the click,
+ * well before the server action resolves.
+ */
 export function SubmitButton({
   children,
-  pendingLabel = "Saving...",
+  pendingLabel = "Saving…",
   className,
   variant,
   size,
   disabled = false,
+  form,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
@@ -36,18 +28,28 @@ export function SubmitButton({
   variant?: ButtonVariant;
   size?: ButtonSize;
   disabled?: boolean;
+  form?: string;
 }) {
   const { pending } = useFormStatus();
 
   return (
     <Button
       type="submit"
-      className={cn("cursor-pointer", className)}
+      form={form}
+      className={className}
       variant={variant}
       size={size}
       disabled={pending || disabled}
+      aria-busy={pending || undefined}
     >
-      {pending ? pendingLabel : children}
+      {pending ? (
+        <>
+          <Spinner />
+          {pendingLabel}
+        </>
+      ) : (
+        children
+      )}
     </Button>
   );
 }

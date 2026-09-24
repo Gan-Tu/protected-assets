@@ -49,6 +49,58 @@ export function formatHumanDateTime(value: string | Date) {
   }).format(date);
 }
 
+/**
+ * "Just now", "5m ago", "3h ago", "Yesterday", then a short date. Compact on
+ * purpose: it sits in dense lists where the full timestamp lives in `title`.
+ */
+export function formatRelativeTime(value: string | Date, nowMs: number) {
+  const date = value instanceof Date ? value : new Date(value);
+  const time = date.getTime();
+
+  if (Number.isNaN(time)) {
+    return "Unknown";
+  }
+
+  const seconds = Math.round((nowMs - time) / 1000);
+
+  if (seconds < 45) return "Just now";
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
+  if (seconds < 2 * 86400) return "Yesterday";
+  if (seconds < 7 * 86400) return `${Math.floor(seconds / 86400)}d ago`;
+
+  const sameYear = new Date(nowMs).getFullYear() === date.getFullYear();
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
+/** Up to two initials from a name, falling back to the email's local part. */
+export function getInitials(name: string | null | undefined, email: string) {
+  const source = name?.trim() || email.split("@")[0] || "?";
+  const words = source
+    .replace(/[^\p{L}\p{N}\s._-]/gu, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+
+  if (!words.length) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/** Stable small integer for a string, e.g. to pick an avatar tone. */
+export function hashToIndex(value: string, modulo: number) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash) % modulo;
+}
+
 /** Deterministic on both server and client, so it is safe to hydrate. */
 export function formatUtcDateTime(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
@@ -65,6 +117,24 @@ export function formatUtcDateTime(value: string | Date) {
     minute: "2-digit",
     timeZone: "UTC",
     timeZoneName: "short",
+  }).format(date);
+}
+
+/**
+ * "Sep 24" in UTC: deterministic on server and client, and about as wide as
+ * the "3d ago" label that replaces it after hydration, so rows don't jump.
+ */
+export function formatShortUtcDate(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
   }).format(date);
 }
 
@@ -118,6 +188,24 @@ export function formatRelativeWindow(
   ].filter(Boolean);
 
   return parts.join(" ");
+}
+
+/**
+ * Live countdown label that coarsens with distance: "6d 23h", "3h 1m",
+ * "4m 12s", "9s". Two units are enough to read at a glance, and a label that
+ * only changes hourly lets subscribers skip re-rendering every second.
+ */
+export function formatCountdown(totalSeconds: number) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+
+  if (days) return hours ? `${days}d ${hours}h` : `${days}d`;
+  if (hours) return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes) return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+  return `${rest}s`;
 }
 
 export function coerceBoolean(value: FormDataEntryValue | null) {

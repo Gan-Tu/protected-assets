@@ -2,18 +2,36 @@
 
 import { startTransition, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2Icon, XIcon } from "lucide-react";
+import { CheckIcon, XIcon } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 type SaveSuccessToastProps = {
   open: boolean;
   message?: string;
+  /** Lift the toast clear of a floating bottom bar (e.g. the editor's save bar). */
+  placement?: "bottom" | "above-bar";
 };
 
+/**
+ * Dark "HUD" toast, bottom-centre: reachable by thumb on phones and out of the
+ * way of page headers on desktop. White on ink is 16:1, so it reads over any
+ * content it floats above.
+ */
 export function SaveSuccessToast({
   open,
-  message = "Changes saved successfully.",
+  message = "Changes saved",
+  placement = "bottom",
 }: SaveSuccessToastProps) {
   const [visible, setVisible] = useState(open);
+  const [lastOpen, setLastOpen] = useState(open);
+
+  // Re-show when `open` flips back on without a remount (e.g. a second save
+  // on the same page), using React's "adjust state during render" pattern.
+  if (open !== lastOpen) {
+    setLastOpen(open);
+    if (open) setVisible(true);
+  }
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -29,7 +47,6 @@ export function SaveSuccessToast({
         router.replace(nextUrl, { scroll: false });
       });
     }
-
   }, [open, pathname, router, searchParams]);
 
   useEffect(() => {
@@ -37,7 +54,7 @@ export function SaveSuccessToast({
 
     const timeoutId = window.setTimeout(() => {
       setVisible(false);
-    }, 2800);
+    }, 3200);
 
     return () => window.clearTimeout(timeoutId);
   }, [visible]);
@@ -47,17 +64,30 @@ export function SaveSuccessToast({
   }
 
   return (
-    <div className="pointer-events-none fixed right-4 top-4 z-50">
-      <div className="pointer-events-auto flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 shadow-lg shadow-emerald-100/60">
-        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-        <p className="font-medium leading-relaxed">{message}</p>
+    <div
+      className={cn(
+        "pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4",
+        placement === "above-bar"
+          ? "bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.5rem)] sm:bottom-[5.25rem]"
+          : "bottom-[max(1.25rem,env(safe-area-inset-bottom))]",
+      )}
+    >
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-auto flex animate-toast-in items-center gap-3 rounded-full bg-[#1d1d1f] py-2 pr-2 pl-3 text-sm text-white shadow-xl ring-1 ring-white/10"
+      >
+        <span className="flex size-5 items-center justify-center rounded-full bg-[#30d158] text-[#0b3d1a]">
+          <CheckIcon className="size-3.5" strokeWidth={3} aria-hidden />
+        </span>
+        <p className="font-medium">{message}</p>
         <button
           type="button"
           onClick={() => setVisible(false)}
-          className="inline-flex cursor-pointer items-center justify-center rounded-md p-1 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-900"
-          aria-label="Dismiss success message"
+          className="inline-flex size-7 cursor-pointer items-center justify-center rounded-full text-[#d8d8dc] transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Dismiss"
         >
-          <XIcon className="size-3.5" />
+          <XIcon className="size-3.5" aria-hidden />
         </button>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeftIcon, ExternalLinkIcon, Trash2Icon } from "lucide-react";
+import { ArrowUpRightIcon, ChevronDownIcon, Trash2Icon } from "lucide-react";
 
 import {
   clearRequestHistoryAction,
@@ -9,11 +9,15 @@ import {
   upsertAssetAction,
 } from "@/app/dashboard/actions";
 import { ConfirmSubmitButton } from "@/components/app/confirm-submit-button";
+import { PageHeader } from "@/components/app/page-header";
 import { SaveSuccessToast } from "@/components/app/save-success-toast";
-import { AssetForm } from "@/components/forms/asset-form";
+import { BackLink } from "@/components/asset-editor/back-link";
+import { ShareLinkCard } from "@/components/asset-editor/share-link-card";
 import { RequestHistoryRow } from "@/components/dashboard/request-history-row";
+import { AssetForm } from "@/components/forms/asset-form";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { requireOwner } from "@/lib/auth";
 import { ASSET_HISTORY_LIMIT, MAX_HISTORY_LIMIT } from "@/lib/constants";
 import { isAppError } from "@/lib/errors";
@@ -25,6 +29,10 @@ export const metadata: Metadata = {
   title: "Edit asset | Protected Assets",
   robots: { index: false, follow: false },
 };
+
+function countLabel(count: number, noun: string) {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`;
+}
 
 export default async function EditAssetPage({
   params,
@@ -57,109 +65,97 @@ export default async function EditAssetPage({
   const deleteFormId = `delete-asset-${asset.id}`;
   const clearHistoryFormId = `clear-request-history-${asset.id}`;
   const hasMoreHistory = historyTotal > history.length;
-  const shareUrl = `${getBaseUrl()}/a/${asset.slug}`;
+  const baseUrl = getBaseUrl();
+  const shareUrl = `${baseUrl}/a/${asset.slug}`;
+  /**
+   * Search params don't remount the page, so a save (which redirects here with
+   * `?saved=1`) would otherwise keep the form's pre-save state: finished
+   * uploads would stay queued for a second submit, and the toast (which reads
+   * `open` once, on mount) would never show. `updated_at` changes on every
+   * save, so keying on it gives both a fresh mount exactly then.
+   */
+  const revision = asset.updated_at;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-12 py-6">
-      <SaveSuccessToast open={saved === "1"} />
-      <header className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Link
-            href="/dashboard"
-            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900"
-          >
-            <ChevronLeftIcon className="size-4" aria-hidden />
-            Back to dashboard
-          </Link>
+    <div className="space-y-8">
+      <SaveSuccessToast
+        key={`toast-${revision}`}
+        open={saved === "1"}
+        placement="above-bar"
+      />
 
-          <div className="grid w-full gap-2 sm:flex sm:w-auto sm:items-center">
+      <PageHeader
+        eyebrow={<BackLink />}
+        title={asset.name}
+        meta={
+          <>
+            {links.length ? (
+              <Badge>{countLabel(links.length, "link")}</Badge>
+            ) : null}
+            {files.length ? (
+              <Badge>{countLabel(files.length, "file")}</Badge>
+            ) : null}
+            <Badge>{countLabel(requestCount, "request")}</Badge>
+          </>
+        }
+        actions={
+          <>
             <Link
               href={shareUrl}
               target="_blank"
               rel="noreferrer"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "lg" }),
-                "w-full cursor-pointer px-4 text-xs font-bold uppercase tracking-wider text-zinc-600 sm:w-auto",
-              )}
+              className={cn(buttonVariants({ variant: "outline" }), "h-10 sm:h-9")}
             >
-              <ExternalLinkIcon className="size-3.5" aria-hidden />
-              Open share page
+              View share page
+              <ArrowUpRightIcon className="text-subtle-foreground" aria-hidden />
+              <span className="sr-only"> (opens in a new tab)</span>
             </Link>
 
-            <form
-              id={deleteFormId}
-              action={deleteAssetAction}
-              className="w-full sm:w-auto"
-            >
+            <form id={deleteFormId} action={deleteAssetAction}>
               <input type="hidden" name="asset_id" value={asset.id} />
               <ConfirmSubmitButton
                 formId={deleteFormId}
-                triggerLabel="Delete asset"
+                triggerLabel="Delete"
                 title="Delete this asset?"
                 description="This removes the asset, its stored files, and any pending auto-release timers. This action cannot be undone."
-                confirmLabel="Delete"
-                triggerVariant="outline"
-                triggerClassName="h-9 w-full px-4 text-xs font-bold uppercase tracking-wider text-red-600 border-red-100 bg-red-50/50 hover:bg-red-50 hover:text-red-700 transition-colors sm:w-auto"
-                icon={<Trash2Icon className="mr-1.5 size-3.5" aria-hidden />}
+                confirmLabel="Delete asset"
+                triggerVariant="destructive-subtle"
+                triggerClassName="h-10 w-full sm:h-9 sm:w-auto"
+                icon={<Trash2Icon aria-hidden />}
               />
             </form>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        <div className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-950 sm:text-3xl">
-              {asset.name}
-            </h1>
-            <div className="flex flex-wrap items-center gap-2">
-              {links.length ? (
-                <Badge
-                  variant="outline"
-                  className="h-5 border-zinc-200 text-[10px] font-bold uppercase tracking-wider text-zinc-600"
-                >
-                  {links.length} {links.length === 1 ? "link" : "links"}
-                </Badge>
-              ) : null}
-              {files.length ? (
-                <Badge
-                  variant="outline"
-                  className="h-5 border-zinc-200 text-[10px] font-bold uppercase tracking-wider text-zinc-600"
-                >
-                  {files.length} {files.length === 1 ? "file" : "files"}
-                </Badge>
-              ) : null}
-              <Badge className="h-5 border-none bg-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                {requestCount} requests
-              </Badge>
-            </div>
-          </div>
-          <p className="max-w-2xl text-sm leading-relaxed text-zinc-500 sm:text-base">
-            Update settings, rotate the share slug, or adjust the release policy.
-          </p>
-        </div>
-      </header>
+      <ShareLinkCard url={shareUrl} />
 
-      <div className="border-t border-zinc-100 pt-8">
-        <AssetForm
-          action={upsertAssetAction}
-          groups={groups}
-          asset={asset}
-          links={links}
-          files={files}
-        />
-      </div>
+      <AssetForm
+        key={`form-${revision}`}
+        action={upsertAssetAction}
+        groups={groups}
+        asset={asset}
+        links={links}
+        files={files}
+        shareBaseUrl={baseUrl}
+        cancelHref="/dashboard"
+      />
 
-      {history.length > 0 && (
-        <section className="space-y-6 border-t border-zinc-100 pt-12">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      {history.length > 0 ? (
+        <section aria-labelledby="activity-heading" className="space-y-4 pt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-1">
-              <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
-                Request history
+              <h2
+                id="activity-heading"
+                className="text-[0.9375rem] leading-6 font-semibold tracking-tight text-foreground"
+              >
+                Activity
               </h2>
-              <p className="text-sm text-zinc-500">
-                The most recent approvals and denials for this asset.
+              <p className="text-sm leading-relaxed text-pretty text-muted-foreground">
+                Approvals, declines and auto-releases for this asset.
               </p>
             </div>
+
             <form
               id={clearHistoryFormId}
               action={clearRequestHistoryAction}
@@ -174,16 +170,18 @@ export default async function EditAssetPage({
               <ConfirmSubmitButton
                 formId={clearHistoryFormId}
                 triggerLabel="Clear history"
-                title="Clear this asset's history?"
+                title="Clear this asset’s history?"
                 description="This removes all approved, auto-approved, and denied requests for this asset, and revokes any download links already emailed for them."
                 confirmLabel="Clear history"
                 triggerVariant="outline"
-                triggerClassName="h-9 w-full px-4 text-xs font-bold uppercase tracking-wider text-zinc-600 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 sm:w-auto"
-                icon={<Trash2Icon className="mr-1.5 size-3.5" aria-hidden />}
+                triggerSize="sm"
+                triggerClassName="h-10 w-full sm:h-8 sm:w-auto"
+                icon={<Trash2Icon aria-hidden />}
               />
             </form>
           </div>
-          <div className="space-y-3">
+
+          <Card className="gap-0 divide-y divide-border overflow-hidden py-0">
             {history.map((request) => (
               <RequestHistoryRow
                 key={request.id}
@@ -196,19 +194,19 @@ export default async function EditAssetPage({
                 processedAt={request.released_at || request.denied_at}
               />
             ))}
-            {hasMoreHistory && (
-              <div className="pt-2 text-center">
-                <Link
-                  href={`/dashboard/assets/${asset.id}?history_limit=all`}
-                  className="text-xs font-bold uppercase tracking-widest text-zinc-500 transition-colors hover:text-zinc-900"
-                >
-                  Show more history ({historyTotal - history.length} more)
-                </Link>
-              </div>
-            )}
-          </div>
+            {hasMoreHistory ? (
+              <Link
+                href={`/dashboard/assets/${asset.id}?history_limit=all`}
+                scroll={false}
+                className="flex h-11 items-center justify-center gap-1.5 text-sm font-medium text-primary outline-none transition-colors duration-150 ease-out-soft hover:bg-surface-subtle focus-visible:bg-primary-subtle"
+              >
+                Show all activity ({historyTotal - history.length} more)
+                <ChevronDownIcon className="size-4" aria-hidden />
+              </Link>
+            ) : null}
+          </Card>
         </section>
-      )}
+      ) : null}
     </div>
   );
 }

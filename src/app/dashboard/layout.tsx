@@ -1,54 +1,79 @@
-import Link from "next/link";
-import { LayoutGridIcon, LogOutIcon, Settings2Icon } from "lucide-react";
+import { LogOutIcon } from "lucide-react";
 
 import { signOutAction } from "@/app/auth/actions";
+import { InitialsAvatar } from "@/components/app/avatar";
 import { LogoMark } from "@/components/app/logo-mark";
+import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import { Button } from "@/components/ui/button";
 import { requireOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-
-const navLinkClass =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 sm:px-3 sm:py-2";
-
-const navItems = [
-  { href: "/dashboard", label: "Overview", icon: LayoutGridIcon },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings2Icon },
-];
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireOwner();
+  const owner = await requireOwner();
+  const email = owner.email ?? "";
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="mx-auto flex max-w-7xl flex-col px-6 py-6 sm:px-8 lg:px-10">
-        <header className="mb-8 flex flex-col gap-4 border-b border-zinc-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <LogoMark />
-          <nav className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 sm:w-auto sm:gap-x-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={navLinkClass}
+    <div className="min-h-dvh bg-canvas">
+      {/* Parked above the viewport until focused, then slides into view. */}
+      <a
+        href="#main"
+        className="fixed top-2 left-2 z-50 -translate-y-24 rounded-lg bg-card px-3 py-2 text-sm font-medium text-foreground shadow-lg ring-1 ring-black/[0.06] outline-none transition-transform duration-150 ease-out-soft focus-visible:translate-y-0 focus-visible:ring-4 focus-visible:ring-primary/25"
+      >
+        Skip to content
+      </a>
+
+      <header className="glass sticky top-0 z-40 border-b border-border/70">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-5 sm:px-6 lg:px-8">
+          {/* Wordmark collapses to the glyph on phones to make room for the tabs. */}
+          <LogoMark
+            href="/dashboard"
+            className="shrink-0 max-sm:[&>span]:hidden"
+          />
+
+          <DashboardNav className="shrink-0" />
+
+          <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+            {email ? (
+              <p className="flex min-w-0 items-center gap-2.5" title={email}>
+                <InitialsAvatar email={email} size="sm" />
+                <span className="sr-only">Signed in as </span>
+                <span className="truncate text-[0.8125rem] font-medium text-nav-foreground max-md:sr-only">
+                  {email}
+                </span>
+              </p>
+            ) : null}
+
+            <span
+              aria-hidden
+              className="mx-1 hidden h-5 w-px shrink-0 bg-border-strong sm:block"
+            />
+
+            <form action={signOutAction} className="shrink-0">
+              <Button
+                type="submit"
+                variant="ghost"
+                size="sm"
+                className="text-nav-foreground hover:bg-black/[0.04] hover:text-foreground max-sm:w-8 max-sm:px-0"
               >
-                <item.icon className="size-4" />
-                {item.label}
-              </Link>
-            ))}
-            <div className="hidden h-4 w-px bg-zinc-200 mx-2 sm:block" />
-            <form action={signOutAction}>
-              <button type="submit" className={navLinkClass}>
-                <LogOutIcon className="size-4" />
-                Sign out
-              </button>
+                <LogOutIcon aria-hidden />
+                <span className="sr-only sm:not-sr-only">Sign out</span>
+              </Button>
             </form>
-          </nav>
-        </header>
-        <main>{children}</main>
-      </div>
+          </div>
+        </div>
+      </header>
+
+      <main
+        id="main"
+        className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
+      >
+        {children}
+      </main>
     </div>
   );
 }

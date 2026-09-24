@@ -12,8 +12,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {
+  Button,
+  type ButtonSize,
+  type ButtonVariant,
+} from "@/components/ui/button";
 
+/**
+ * Trigger + confirmation dialog for a destructive plain-form submit. The
+ * confirm button submits the form by id, so the form itself can stay a server
+ * component.
+ */
 export function ConfirmSubmitButton({
   formId,
   triggerLabel,
@@ -23,6 +32,7 @@ export function ConfirmSubmitButton({
   confirmLabel,
   triggerClassName,
   triggerVariant = "outline",
+  triggerSize,
   confirmVariant = "destructive",
   icon,
 }: {
@@ -34,8 +44,9 @@ export function ConfirmSubmitButton({
   description: string;
   confirmLabel: string;
   triggerClassName?: string;
-  triggerVariant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
-  confirmVariant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
+  triggerVariant?: ButtonVariant;
+  triggerSize?: ButtonSize;
+  confirmVariant?: ButtonVariant;
   icon?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,6 +60,7 @@ export function ConfirmSubmitButton({
           <Button
             type="button"
             variant={triggerVariant}
+            size={triggerSize}
             className={triggerClassName}
             aria-label={triggerAriaLabel ?? (triggerLabel || title)}
           />
@@ -63,14 +75,13 @@ export function ConfirmSubmitButton({
           <DialogDescription id={descriptionId}>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" className="cursor-pointer" />}>
+          <DialogClose render={<Button type="button" variant="outline" />}>
             Cancel
           </DialogClose>
           <Button
             type="submit"
             form={formId}
             variant={confirmVariant}
-            className="cursor-pointer"
             onClick={() => setOpen(false)}
           >
             {confirmLabel}

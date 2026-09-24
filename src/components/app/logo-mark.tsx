@@ -1,21 +1,51 @@
 import Link from "next/link";
-import Image from "next/image";
 
-export function LogoMark({ compact = false }: { compact?: boolean }) {
+import { cn } from "@/lib/utils";
+
+/**
+ * Vector trace of public/logo.png (IoU 0.99 against the original). Inline, so
+ * the mark costs no request, stays crisp at any DPR and takes `currentColor`.
+ * The PNG it replaced was fetched at up to 1920px wide for a 32px slot.
+ */
+const LOGO_PATH =
+  "M45.5 0 10.7 10.2 9.9 10.8 10 38.9 34.5 39.1 34.5 81.6 34.1 81.7 31.3 79.6 25.4 73.9 22.6 70 20.7 66.5 18.8 61.3 18.2 58 17.9 47.2 9.9 47.3 9.9 57.3 10.7 62.6 12.9 69.2 15.5 74.1 20.5 80.7 26.9 86.6 36 93 47.6 99.2 49.5 100 50.7 100 63.5 93.4 68.1 90.4 75.3 84.9 81.6 78.4 83.9 75.2 87.1 69.4 89.3 63 90.1 57.3 90.1 10.7 55.6 0.2 53.9 0.4 53.9 8.2 54.3 8.7 82 17 82 55.6 81.4 60.5 79.8 65.7 77.8 69.5 74.1 74.5 70.3 78.3 64.9 82.6 59.4 86.2 54 89.2 50.7 90.9 49.5 90.9 42.8 87.3 42.8 61.2 61.6 61 63.9 59.7 64.5 58.2 64.5 33.5 63.9 32.1 61.7 30.8 18.3 30.8 18 30.4 18.2 16.8 45.8 8.5 46.1 0.1 45.6 0ZM42.8 39.1 55.6 39.1 56.3 39.6 56.5 51.4 55.8 52.7 42.8 52.7 42.8 39.3Z";
+
+export function LogoGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      aria-hidden
+      className={cn("size-7 shrink-0", className)}
+    >
+      <path fill="currentColor" fillRule="evenodd" d={LOGO_PATH} />
+    </svg>
+  );
+}
+
+export function LogoMark({
+  compact = false,
+  href = "/",
+  className,
+}: {
+  compact?: boolean;
+  href?: string;
+  className?: string;
+}) {
   return (
     <Link
-      href="/"
-      className="inline-flex cursor-pointer items-center gap-2.5 rounded-md py-1 text-sm font-bold tracking-tight text-zinc-900"
+      href={href}
+      aria-label="Protected Assets home"
+      className={cn(
+        "inline-flex items-center gap-2 rounded-md text-foreground outline-none transition-opacity duration-150 hover:opacity-75 focus-visible:ring-4 focus-visible:ring-primary/25",
+        className,
+      )}
     >
-      <span className="relative block size-8 shrink-0">
-        <Image
-          src="/logo.png"
-          alt="Protected Assets Logo"
-          fill
-          className="object-contain"
-        />
-      </span>
-      {!compact ? <span className="uppercase tracking-[0.1em]">Protected Assets</span> : null}
+      <LogoGlyph />
+      {!compact ? (
+        <span className="text-[0.9375rem] font-semibold tracking-[-0.02em] whitespace-nowrap">
+          Protected Assets
+        </span>
+      ) : null}
     </Link>
   );
 }

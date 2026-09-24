@@ -1,9 +1,33 @@
-import { CheckCircle2Icon, ClockIcon, MailIcon, XCircleIcon } from "lucide-react";
+import { MessageSquareTextIcon } from "lucide-react";
 
+import { InitialsAvatar } from "@/components/app/avatar";
 import { LocalTime } from "@/components/app/local-time";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+type HistoryStatus = "approved" | "denied" | "auto_approved" | "pending";
+
+const statusMeta: Record<
+  HistoryStatus,
+  {
+    label: string;
+    variant: React.ComponentProps<typeof Badge>["variant"];
+    verb: string;
+  }
+> = {
+  approved: { label: "Approved", variant: "success", verb: "Released" },
+  auto_approved: { label: "Auto-released", variant: "accent", verb: "Released" },
+  denied: { label: "Declined", variant: "danger", verb: "Declined" },
+  pending: { label: "Pending", variant: "neutral", verb: "Requested" },
+};
+
+/**
+ * One borderless row, meant to sit inside
+ * `<Card className="gap-0 divide-y divide-border overflow-hidden py-0">`.
+ * Used by the dashboard's Activity list and the asset editor's history.
+ *
+ * Phones: status + time drop under the text instead of squeezing a column.
+ */
 export function RequestHistoryRow({
   requesterName,
   requesterEmail,
@@ -13,98 +37,77 @@ export function RequestHistoryRow({
   status,
   createdAt,
   processedAt,
+  className,
 }: {
   requesterName?: string | null;
   requesterEmail: string;
   assetName?: string;
   reason: string;
   decisionNote?: string | null;
-  status: "approved" | "denied" | "auto_approved" | "pending";
+  status: HistoryStatus;
   createdAt: string;
   processedAt?: string | null;
+  className?: string;
 }) {
-  const isApproved = status === "approved" || status === "auto_approved";
-  const isDenied = status === "denied";
+  const name = requesterName?.trim();
+  const meta = statusMeta[status] ?? statusMeta.pending;
+  const showProcessed = status !== "pending" && Boolean(processedAt);
 
   return (
-    <div className="rounded-xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex-1 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
-              <MailIcon className="size-3.5 text-zinc-400" aria-hidden />
-              <span>{requesterName?.trim() || requesterEmail}</span>
-              {requesterName?.trim() ? (
-                <span className="text-xs font-medium text-zinc-500">
-                  {requesterEmail}
-                </span>
-              ) : null}
+    <div className={cn("flex gap-3 px-4 py-4 sm:gap-3.5 sm:px-5", className)}>
+      <InitialsAvatar
+        name={name}
+        email={requesterEmail}
+        size="sm"
+        className="-mt-0.5"
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-6">
+        <div className="min-w-0 flex-1">
+          <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
+            <span className="truncate text-sm font-medium text-foreground">
+              {name || requesterEmail}
             </span>
-            {assetName && (
-              <Badge
-                variant="outline"
-                className="h-4 border-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-500"
-              >
-                {assetName}
-              </Badge>
-            )}
-            <Badge
-              className={cn(
-                "h-4 border-none text-[10px] font-bold uppercase tracking-wider",
-                status === "approved" && "bg-emerald-50 text-emerald-700",
-                status === "auto_approved" && "bg-blue-50 text-blue-700",
-                status === "denied" && "bg-red-50 text-red-700",
-                status === "pending" && "bg-zinc-100 text-zinc-600",
-              )}
-            >
-              {status.replace("_", " ")}
-            </Badge>
-          </div>
-          <p className="line-clamp-1 text-xs italic text-zinc-500">
+            {name ? (
+              <span className="truncate text-[0.8125rem] text-muted-foreground">
+                {requesterEmail}
+              </span>
+            ) : null}
+          </p>
+
+          <p className="line-clamp-1 text-[0.8125rem] leading-5 break-words text-muted-foreground">
+            {assetName ? (
+              <>
+                <span className="font-medium text-foreground">{assetName}</span>
+                <span aria-hidden> · </span>
+              </>
+            ) : null}
+            <span className="sr-only">Reason: </span>
             &ldquo;{reason}&rdquo;
           </p>
+
           {decisionNote ? (
-            <div className="whitespace-pre-line rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600">
-              <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-                Note
-              </span>
-              {decisionNote}
+            <div className="mt-2.5 flex gap-2 rounded-lg bg-muted px-3 py-2">
+              <MessageSquareTextIcon
+                aria-hidden
+                className="mt-[3px] size-3.5 shrink-0 text-subtle-foreground"
+              />
+              <p className="min-w-0 text-[0.8125rem] leading-relaxed break-words whitespace-pre-line text-muted-foreground">
+                <span className="sr-only">Note: </span>
+                {decisionNote}
+              </p>
             </div>
           ) : null}
         </div>
 
-        <div className="flex items-center gap-4 whitespace-nowrap text-[11px] font-medium text-zinc-500">
-          <div className="flex flex-col items-end">
-            <span className="flex items-center gap-1">
-              <ClockIcon className="size-3" aria-hidden />
-              <LocalTime value={createdAt} prefix="Requested " />
-            </span>
-            {processedAt && (
-              <LocalTime
-                value={processedAt}
-                className="text-zinc-400"
-                prefix={`${isApproved ? "Released" : isDenied ? "Denied" : "Processed"} `}
-              />
-            )}
-          </div>
-          <div
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full",
-              isApproved
-                ? "bg-emerald-50 text-emerald-600"
-                : isDenied
-                  ? "bg-red-50 text-red-600"
-                  : "bg-zinc-50 text-zinc-400",
-            )}
-          >
-            {isApproved ? (
-              <CheckCircle2Icon className="size-4" aria-hidden />
-            ) : isDenied ? (
-              <XCircleIcon className="size-4" aria-hidden />
-            ) : (
-              <ClockIcon className="size-4" aria-hidden />
-            )}
-          </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-x-2.5 gap-y-1 sm:flex-col sm:items-end sm:gap-1.5">
+          <Badge variant={meta.variant}>{meta.label}</Badge>
+          <LocalTime
+            relative
+            value={showProcessed ? processedAt : createdAt}
+            prefix={showProcessed ? `${meta.verb} ` : "Requested "}
+            className="text-xs whitespace-nowrap text-muted-foreground tabular"
+          />
         </div>
       </div>
     </div>
