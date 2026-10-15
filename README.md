@@ -97,6 +97,32 @@ See `.env.example`. Notes on the subtle ones:
 
 ## Database
 
+### Supabase keepalive
+
+After deploying, point the existing Upstash QStash schedule at
+`https://vault.tugan.app/api/qstash/keepalive` instead of `/`:
+
+- Method: **GET** or **POST**; no request body is required.
+- Cron: **`0 */6 * * *`** (every six hours, UTC).
+- Authentication: QStash automatically sends `Upstash-Signature`. The endpoint
+  verifies it using the existing `QSTASH_CURRENT_SIGNING_KEY` and
+  `QSTASH_NEXT_SIGNING_KEY` and checks the signed destination against the incoming
+  request URL. No new credentials or callback URL configuration are needed.
+- A successful delivery returns **200** with `{"ok":true}`. Database failures
+  return **503** so QStash can retry; unsigned requests return **401**.
+
+Every authenticated request performs a fresh, ten-second-bounded read of at most
+one `profiles.id`. It works with an empty table, does not modify data, and never
+returns database records. Both the route's fetches and its responses are uncached.
+The homepage only checks for a session cookie and is not a database keepalive.
+
+[Supabase's current guidance](https://supabase.com/docs/guides/platform/free-project-pausing)
+says a few database requests each day are typically sufficient. A weekly ping
+is too close to the seven-day inactivity window; periodic queries are not a
+guarantee against pausing. Already-paused projects must first be resumed.
+
+### Schema and maintenance
+
 - `supabase/migrations/` - additive, safe to run in order.
 - `supabase/maintenance/` - hand-run operational scripts. Not migrations; read
   the README there before running anything.
