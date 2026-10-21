@@ -102,7 +102,9 @@ See `.env.example`. Notes on the subtle ones:
 After deploying, point the existing Upstash QStash schedule at
 `https://vault.tugan.app/api/qstash/keepalive` instead of `/`:
 
-- Method: **GET** or **POST**; no request body is required.
+- Method: **POST**, with an optional `{}` JSON body. Avoid GET with a body:
+  intermediaries may discard it, causing QStash body-hash verification to fail.
+  Bodyless GET remains supported.
 - Cron: **`0 */6 * * *`** (every six hours, UTC).
 - Authentication: QStash automatically sends `Upstash-Signature`. The endpoint
   verifies it using the existing `QSTASH_CURRENT_SIGNING_KEY` and
@@ -115,6 +117,12 @@ Every authenticated request performs a fresh, ten-second-bounded read of at most
 one `profiles.id`. It works with an empty table, does not modify data, and never
 returns database records. Both the route's fetches and its responses are uncached.
 The homepage only checks for a session cookie and is not a database keepalive.
+
+If a signed delivery returns 503, inspect the server-side `qstash.keepalive` log.
+For `PGRST205`, first verify the configured Supabase project and that `profiles`
+exists. If it exists but is missing from the API schema cache, refresh that cache
+with `NOTIFY pgrst, 'reload schema';` and retry the delivery. Do not disable
+signature verification to troubleshoot database errors.
 
 [Supabase's current guidance](https://supabase.com/docs/guides/platform/free-project-pausing)
 says a few database requests each day are typically sufficient. A weekly ping

@@ -91,6 +91,18 @@ describe("QStash Supabase keepalive", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("rejects a GET whose signed body was dropped without logging the token", async () => {
+    const token = signature("{}");
+    const response = await GET(request("GET", "", token));
+    expect(response.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      "[protected-assets] qstash.keepalive.signature",
+      { name: expect.any(String), method: "GET" },
+    );
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(token);
+  });
+
   it("fails closed when signing keys are missing", async () => {
     vi.stubEnv("QSTASH_CURRENT_SIGNING_KEY", "");
     const response = await GET(request());

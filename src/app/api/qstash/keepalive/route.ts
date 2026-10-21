@@ -37,7 +37,12 @@ async function keepalive(request: Request) {
     if (!isValid) {
       return json({ ok: false, error: "Invalid signature" }, 401);
     }
-  } catch {
+  } catch (error) {
+    // Do not log the JWT, request body, or verifier message (which can contain them).
+    logError("qstash.keepalive.signature", {
+      name: error instanceof Error ? error.name : "UnknownVerificationError",
+      method: request.method,
+    });
     return json({ ok: false, error: "Invalid signature" }, 401);
   }
 
